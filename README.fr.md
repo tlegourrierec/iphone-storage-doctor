@@ -175,6 +175,7 @@ outils en ligne de commande ; toute la sortie, elle, est traduite.
 | `command not found: ipsd` | pipx l'a installé hors de ton PATH. Lance `pipx ensurepath`, puis ouvre un nouveau terminal. |
 | `Aucun iPhone détecté` alors qu'il est branché | Déverrouille l'écran. La demande d'appairage n'apparaît que sur un appareil déverrouillé, et elle expire. |
 | `iPhone détecté mais non appairé` | Touche **Se fier à cet ordinateur** sur le téléphone, puis saisis son code. |
+| Toujours « non appairé » après avoir accepté, ou la fenêtre n'apparaît jamais | L'appareil a mémorisé un refus précédent. Débranche et rebranche, écran déverrouillé. Sinon : **Réglages › Général › Transférer ou réinitialiser l'iPhone › Réinitialiser › Réinitialiser localisation et confidentialité**, puis rebranche. Ça efface la liste des ordinateurs refusés, et rien d'autre. |
 | L'outil s'arrête en cours de route | Le câble a bougé. Rien ne reste à moitié supprimé : les fichiers sont copiés avant d'être retirés. Rebranche et relance. |
 | La sortie est dans la mauvaise langue | `ipsd lang fr` ou `ipsd lang en`. |
 | `brew install` dit que les Command Line Tools sont périmés | Homebrew compile depuis les sources : `sudo rm -rf /Library/Developer/CommandLineTools && sudo xcode-select --install`. Ou passe par `./install.sh`, qui n'a besoin d'aucun compilateur. |
