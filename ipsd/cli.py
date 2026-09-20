@@ -389,6 +389,10 @@ async def clean(udid, do_apply, no_quarantine, quarantine_dir, do_crash, yes):
             console.print("[yellow]" + t("cli.cancelled") + "[/yellow]")
             return
 
+    if do_apply:
+        # Le parcours a pu durer plusieurs minutes : on repart d'une connexion
+        # neuve, la session lockdown n'y survivant pas toujours.
+        lockdown = await connect(udid)
     report = await clean_mod.run(
         lockdown,
         findings,
@@ -664,6 +668,8 @@ async def boost(udid, do_apply, no_quarantine, yes):
             console.print("[yellow]" + t("cli.cancelled") + "[/yellow]")
             return
 
+    if do_apply:
+        lockdown = await connect(udid)
     report = await clean_mod.run(
         lockdown,
         findings,

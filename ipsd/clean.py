@@ -56,6 +56,23 @@ def build_plan(findings: list[Finding], sizes: dict[str, int] | None = None) -> 
     return plan
 
 
+CHUNK = 1024 * 1024
+
+
+async def _stream_to_disk(afc: AfcService, path: str, dest: Path) -> None:
+    """Copie un fichier de l'appareil vers le Mac, par blocs."""
+    handle = await afc.fopen(path)
+    try:
+        with dest.open("wb") as out:
+            while True:
+                chunk = await afc.fread(handle, CHUNK)
+                if not chunk:
+                    break
+                out.write(chunk)
+    finally:
+        await afc.fclose(handle)
+
+
 def selectable(findings: list[Finding]) -> list[Finding]:
     """Seuls les constats SAFE assortis de chemins sont supprimables."""
     return [f for f in findings if f.tier == SAFE and f.paths]
@@ -100,10 +117,11 @@ async def run(
         for path in paths:
             try:
                 if quarantine:
-                    data = await afc.get_file_contents(path)
                     dest = qdir / path.lstrip("/")
                     dest.parent.mkdir(parents=True, exist_ok=True)
-                    dest.write_bytes(data)
+                    # On streame : charger un fichier de plusieurs centaines de
+                    # Mo en mémoire fait tomber la liaison USB sur certains iOS.
+                    await _stream_to_disk(afc, path, dest)
                     report.archived += 1
                 await afc.rm_single(path)
                 report.deleted += 1
