@@ -23,6 +23,39 @@ class CleanReport:
     quarantine_dir: Path | None = None
 
 
+@dataclass
+class Plan:
+    """Ce qui serait supprimé, résumé pour être soumis à l'utilisateur."""
+
+    findings: list[Finding] = field(default_factory=list)
+    paths: list[str] = field(default_factory=list)
+    total_bytes: int = 0
+
+    @property
+    def is_empty(self) -> bool:
+        return not self.paths
+
+    def lines(self) -> list[str]:
+        return [f"{f.title} — {f.count} fichiers" for f in self.findings]
+
+
+def build_plan(findings: list[Finding], sizes: dict[str, int] | None = None) -> Plan:
+    """Construit la liste exacte des fichiers concernés, sans rien supprimer.
+
+    Séparé de l'exécution pour que l'utilisateur voie précisément ce qu'il
+    approuve avant que quoi que ce soit ne parte.
+    """
+    sizes = sizes or {}
+    plan = Plan()
+    for finding in selectable(findings):
+        plan.findings.append(finding)
+        for path in finding.paths:
+            if path not in plan.paths:
+                plan.paths.append(path)
+    plan.total_bytes = sum(sizes.get(p, 0) for p in plan.paths)
+    return plan
+
+
 def selectable(findings: list[Finding]) -> list[Finding]:
     """Seuls les constats SAFE assortis de chemins sont supprimables."""
     return [f for f in findings if f.tier == SAFE and f.paths]

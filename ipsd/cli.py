@@ -27,6 +27,9 @@ from . import (
     __version__,
 )
 from . import (
+    actions as actions_mod,
+)
+from . import (
     apps as apps_mod,
 )
 from . import (
@@ -46,10 +49,12 @@ from . import (
 )
 from .device import DeviceError, connect, get_disk_usage, get_info
 from .report import (
+    action_plan,
     apps_table,
     console,
     device_panel,
     findings_table,
+    levels_table,
     storage_table,
     to_json,
 )
@@ -95,6 +100,29 @@ def coro(fn):
             sys.exit(130)
 
     return wrapper
+
+
+def confirm_deletion(what: str, count: int, size: str, assume_yes: bool) -> bool:
+    """Demande l'accord avant toute suppression sur l'appareil.
+
+    Rien n'est jamais supprimé sur la seule présence de --apply. Hors terminal
+    interactif, on refuse plutôt que de supposer un accord.
+    """
+    if assume_yes:
+        return True
+    if not sys.stdin.isatty():
+        err.print(
+            "[bold red]✗[/bold red] Suppression annulée : pas de terminal "
+            "interactif pour demander confirmation.\n"
+            "  Ajoute --yes si tu exécutes la commande depuis un script."
+        )
+        return False
+    console.print(
+        f"\n[bold]{count} fichiers[/bold] ({size}) seront supprimés de "
+        f"l'iPhone : {what}."
+    )
+    console.print("[dim]Une copie est faite sur le Mac au préalable.[/dim]")
+    return click.confirm("Confirmer la suppression ?", default=False)
 
 
 udid_option = click.option("--udid", default=None, help="Cible un appareil précis.")
@@ -236,10 +264,7 @@ async def doctor(udid, as_json, profile, no_apps, no_media):
             + (f", {len(scan.errors)} dossiers illisibles" if scan.errors else "")
             + ".[/dim]"
         )
-    console.print(
-        "\n[dim]Pour récupérer ce qui est marqué SÛR : [bold]ipsd clean[/bold] "
-        "(simulation), puis [bold]ipsd clean --apply[/bold].[/dim]"
-    )
+    action_plan(actions_mod.build(findings, app_list, health, disk))
 
 
 @main.command()
@@ -257,8 +282,9 @@ async def doctor(udid, as_json, profile, no_apps, no_media):
     help=f"Dossier d'archivage (défaut : {clean_mod.DEFAULT_QUARANTINE}).",
 )
 @click.option("--crash", "do_crash", is_flag=True, help="Traite aussi les rapports de plantage.")
+@click.option("--yes", is_flag=True, help="Passe la confirmation (scripts).")
 @coro
-async def clean(udid, do_apply, no_quarantine, quarantine_dir, do_crash):
+async def clean(udid, do_apply, no_quarantine, quarantine_dir, do_crash, yes):
     """Supprime les fichiers classés SÛR. Simulation par défaut."""
     lockdown = await connect(udid)
 
@@ -275,6 +301,17 @@ async def clean(udid, do_apply, no_quarantine, quarantine_dir, do_crash):
 
     for f in targets:
         console.print(f"  [green]•[/green] {f.title} — {human(f.bytes)} ({f.count} fichiers)")
+
+    plan = clean_mod.build_plan(findings, sizes)
+    if do_apply and not plan.is_empty:
+        if not confirm_deletion(
+            ", ".join(f.title.lower() for f in plan.findings),
+            len(plan.paths),
+            human(plan.total_bytes),
+            yes,
+        ):
+            console.print("[yellow]Annulé. Rien n'a été supprimé.[/yellow]")
+            return
 
     report = await clean_mod.run(
         lockdown,
@@ -308,6 +345,10 @@ async def clean(udid, do_apply, no_quarantine, quarantine_dir, do_crash):
             console.print("\n[dim]Aucun rapport de plantage.[/dim]")
         elif not do_apply:
             console.print(f"\n[yellow]Simulation.[/yellow] {crashes.count} rapports à archiver.")
+        elif not confirm_deletion(
+            "rapports de plantage", crashes.count, "quelques Mo", yes
+        ):
+            console.print("[yellow]Rapports de plantage conservés.[/yellow]")
         else:
             size = await crash_mod.archive_and_clear(lockdown, dest, erase=True)
             console.print(
@@ -449,10 +490,47 @@ async def restart(udid, yes):
 
 @main.command()
 @udid_option
+@json_option
+@coro
+async def plan(udid, as_json):
+    """Les trois niveaux de nettoyage, et ce que chacun rapporte."""
+    lockdown = await connect(udid)
+    info = await get_info(lockdown)
+    disk = await get_disk_usage(lockdown)
+    health = await battery_mod.collect(lockdown, info.product_type)
+
+    with console.status("Mesure des applications…"):
+        app_list = await apps_mod.collect(lockdown)
+    async with MediaScanner(lockdown, profile="deep") as scanner:
+        with console.status("Parcours du volume média…") as status:
+
+            def progress(count, path):
+                status.update(f"Parcours du volume média… {count} fichiers")
+
+            scan = await scanner.scan(on_progress=progress)
+
+    findings = analyse_media(scan)
+    try:
+        findings += analyse_crashes(await crash_mod.collect(lockdown))
+    except Exception:  # noqa: BLE001 - service optionnel
+        pass
+
+    levels = actions_mod.build_levels(findings, app_list, health, disk)
+    if as_json:
+        click.echo(to_json({"device": info, "disk": disk, "levels": levels}))
+        return
+
+    device_panel(info, disk)
+    levels_table(levels, free_before=disk.free)
+
+
+@main.command()
+@udid_option
 @click.option("--apply", "do_apply", is_flag=True, help="Exécute réellement le nettoyage.")
 @click.option("--no-quarantine", is_flag=True, help="Supprime sans copier sur le Mac.")
+@click.option("--yes", is_flag=True, help="Passe la confirmation (scripts).")
 @coro
-async def boost(udid, do_apply, no_quarantine):
+async def boost(udid, do_apply, no_quarantine, yes):
     """Relevé avant, nettoyage sûr, relevé après. Le bilan complet en une commande."""
     lockdown = await connect(udid)
     info = await get_info(lockdown)
@@ -493,6 +571,18 @@ async def boost(udid, do_apply, no_quarantine):
     sizes = {f.path: f.size for f in scan.files}
     for f in clean_mod.selectable(findings):
         console.print(f"  [green]•[/green] {f.title} — {human(f.bytes)} ({f.count} fichiers)")
+
+    plan = clean_mod.build_plan(findings, sizes)
+    if do_apply and (not plan.is_empty or crashes_before.count):
+        what = ", ".join(f.title.lower() for f in plan.findings) or "rapports de plantage"
+        if not confirm_deletion(
+            what,
+            len(plan.paths) + crashes_before.count,
+            human(plan.total_bytes),
+            yes,
+        ):
+            console.print("[yellow]Annulé. Rien n'a été supprimé.[/yellow]")
+            return
 
     report = await clean_mod.run(
         lockdown,
@@ -554,20 +644,10 @@ async def boost(udid, do_apply, no_quarantine):
     for failure in report.failures[:3]:
         console.print(f"[red]✗[/red] {failure}")
 
-    console.print()
-    console.print(Rule("[bold]Ce qui reste à gagner[/bold]", style="dim"))
     with console.status("Mesure des applications…"):
         app_list = await apps_mod.collect(lockdown)
-    advice = sort_findings(analyse_apps(app_list))
-    for f in advice:
-        console.print(f"  [yellow]•[/yellow] [bold]{f.title}[/bold] — {human(f.bytes)}")
-        console.print(f"    [dim]{f.detail}[/dim]")
-    if health is not None and health.throttling_likely:
-        console.print(
-            f"\n  [red]•[/red] [bold]Batterie à {health.health_percent:.0f} %[/bold] — "
-            "c'est ce qui ralentit l'appareil, pas le stockage."
-        )
-        console.print(f"    [dim]{health.verdict()}[/dim]")
+    remaining = analyse_media(scan) + analyse_apps(app_list)
+    action_plan(actions_mod.build(remaining, app_list, health, after))
 
 
 @main.command()

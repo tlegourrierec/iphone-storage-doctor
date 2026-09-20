@@ -8,6 +8,7 @@ from typing import Any
 
 from rich.console import Console
 from rich.panel import Panel
+from rich.rule import Rule
 from rich.table import Table
 from rich.text import Text
 
@@ -138,6 +139,75 @@ def apps_table(apps, limit: int = 20) -> None:
             f"{ratio * 100:.0f} %",
         )
     console.print(table)
+
+
+def action_plan(plan) -> None:
+    """Le plan d'action : une commande par ligne, un gain, un risque annoncé."""
+    from .actions import AUTO, CHOICE, EXTERNAL
+
+    if not plan.actions:
+        console.print("[green]Rien à faire. L'appareil est propre.[/green]")
+        return
+
+    label = {AUTO: "SANS RISQUE", CHOICE: "TON CHOIX", EXTERNAL: "HORS OUTIL"}
+    style = {AUTO: "bold green", CHOICE: "bold yellow", EXTERNAL: "bold cyan"}
+
+    console.print()
+    console.print(Rule("[bold]Ce que je peux faire maintenant[/bold]", style="dim"))
+    console.print()
+
+    for index, action in enumerate(plan.actions, start=1):
+        gain = human(action.gain_bytes) if action.gain_bytes else "—"
+        head = Text()
+        head.append(f" {index}. ", style="bold")
+        head.append(action.title, style="bold")
+        head.append(f"   {gain}", style="bold green" if action.gain_bytes else "dim")
+        head.append(f"   {label.get(action.kind, '')}", style=style.get(action.kind, ""))
+        console.print(head)
+        console.print(f"    [dim]{action.why}[/dim]")
+        if action.command:
+            console.print(f"    [bold cyan]{action.command}[/bold cyan]")
+        if action.caveat:
+            console.print(f"    [dim]{action.caveat}[/dim]")
+        console.print()
+
+    if plan.reclaimable_total:
+        console.print(
+            f" [green]Récupérable sans rien perdre :[/green] "
+            f"[bold]{human(plan.reclaimable_now)}[/bold]"
+            f"    [yellow]Au total si tu vas au bout :[/yellow] "
+            f"[bold]{human(plan.reclaimable_total)}[/bold]"
+        )
+
+
+def levels_table(levels, free_before: int = 0) -> None:
+    """Les trois paliers, avec ce que chacun rapporte et ce qu'il coûte."""
+    console.print()
+    console.print(Rule("[bold]Trois niveaux de nettoyage[/bold]", style="dim"))
+    console.print()
+
+    for level in levels:
+        head = Text()
+        head.append(f" {level.title.upper()}", style="bold")
+        head.append(f"   +{human(level.gain_bytes)}", style="bold green")
+        if free_before:
+            head.append(
+                f"   {human(free_before)} → {human(free_before + level.gain_bytes)} libres",
+                style="dim",
+            )
+        console.print(head)
+        console.print(f"    {level.promise}")
+        console.print(
+            f"    [{'green' if level.is_lossless else 'yellow'}]{level.cost}[/]"
+        )
+        console.print(f"    [bold cyan]{level.command}[/bold cyan]")
+        console.print()
+
+    console.print(
+        " [dim]Aucun niveau ne touche aux photos, aux bases iOS, ni aux apps\n"
+        " porteuses de données uniques (2FA, messageries, éditeurs photo).\n"
+        " Chaque suppression est confirmée par toi avant exécution.[/dim]"
+    )
 
 
 def _encode(obj: Any) -> Any:

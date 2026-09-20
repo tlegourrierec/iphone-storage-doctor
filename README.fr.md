@@ -79,8 +79,9 @@ ipsd storage     # compteurs, instantané
 ipsd doctor      # diagnostic complet (~2-3 min, parcourt le volume média)
 ipsd apps        # classement des apps par espace occupé
 ipsd clean       # simulation de nettoyage
-ipsd clean --apply --crash   # exécution réelle
+ipsd clean --apply --crash   # exécution réelle, après confirmation
 ipsd purge       # apps désinstallables, avec le gain chiffré
+ipsd plan        # les trois niveaux de nettoyage et leurs gains
 ipsd purgeable   # ce qu'iOS appelle « libérable », et pourquoi on n'y touche pas
 ipsd trend       # dérive du stockage entre deux instantanés
 ipsd restart     # redémarre l'iPhone
@@ -94,6 +95,14 @@ Toutes les commandes acceptent `--json` pour être branchées sur autre chose.
 photothèque. Compte ~30 s au lieu de ~2-3 min, avec un inventaire moins fin.
 
 ## Le modèle de sûreté
+
+### Rien n'est supprimé sans ton accord
+
+`--apply` ne vaut pas consentement. Avant de retirer quoi que ce soit de
+l'appareil, l'outil affiche exactement ce qu'il a trouvé — combien de fichiers,
+quel volume, quelle catégorie — et attend un oui. Hors terminal interactif, il
+refuse d'agir plutôt que de supposer un accord ; `--yes` existe pour les
+scripts, et doit être tapé délibérément.
 
 Chaque constat porte un niveau, et l'outil ne supprime **que** le premier :
 

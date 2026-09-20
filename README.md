@@ -92,6 +92,7 @@ Plug in the iPhone, unlock it, tap **Trust This Computer**, then run `ipsd docto
 | `ipsd battery` | Real battery health and throttling verdict |
 | `ipsd storage` | Counters only, instant |
 | `ipsd apps` | Every app ranked by space, binary vs data |
+| `ipsd plan` | Three cleaning levels, with what each one reclaims |
 | `ipsd purgeable` | What iOS calls "purgeable", and why not to chase it |
 | `ipsd clean` | Delete files classified SAFE (dry run by default) |
 | `ipsd purge` | Uninstall apps to reclaim their cache, with guardrails |
@@ -101,6 +102,28 @@ Plug in the iPhone, unlock it, tap **Trust This Computer**, then run `ipsd docto
 Every command takes `--json`.
 
 ## Safety model
+
+### Three levels, each with its price named
+
+`ipsd plan` shows what each level reclaims before you commit to any of it:
+
+| Level | What it does | What it costs |
+|---|---|---|
+| **Simple** | Regenerable caches, crash reports | Nothing. iOS rebuilds them. |
+| **Advanced** | + reinstall the three most cache-bloated apps | Sign in again on those apps |
+| **Maximum** | + every re-downloadable app with no unique local data | Sign in again on each |
+
+No level touches photos, iOS databases, or apps holding irreplaceable data.
+Those exclusions are structural, not options — a test asserts that even the
+maximum level leaves them alone.
+
+### Nothing is deleted without you saying yes
+
+`--apply` is not consent. Before removing anything from the device, the tool
+prints exactly what it found — how many files, how much space, which category —
+and waits for a yes. Outside an interactive terminal it refuses to proceed
+rather than assume agreement; `--yes` is available for scripts and CI, and has
+to be typed deliberately.
 
 Findings carry one of three levels, and the tool only ever deletes the first:
 
