@@ -65,11 +65,14 @@ avant/après pour confirmer le gain réel plutôt que l'estimation.
 brew install --formula ./Formula/iphone-storage-doctor.rb
 ```
 
-### pipx (plus rapide)
+### Recommandé : le script d'installation
 
 ```bash
 ./install.sh
 ```
+
+Il vérifie que le Python utilisé est bien en 3.11 ou plus — macOS livre encore
+3.9, ce qui est la cause la plus fréquente d'échec d'un `pip3 install`.
 
 ## Utilisation
 
@@ -156,6 +159,22 @@ suit la locale du système et se rabat sur l'anglais.
 
 L'aide des commandes (`--help`) reste en anglais, comme le veut l'usage des
 outils en ligne de commande ; toute la sortie, elle, est traduite.
+
+
+## En cas de problème
+
+| Symptôme | Cause et solution |
+|---|---|
+| `requires a different Python: 3.9.x not in '>=3.11'` | macOS livre Python 3.9. Passe par `./install.sh` ou pipx, qui apportent leur propre interpréteur — pas par `pip3 install`. |
+| `command not found: ipsd` | pipx l'a installé hors de ton PATH. Lance `pipx ensurepath`, puis ouvre un nouveau terminal. |
+| `Aucun iPhone détecté` alors qu'il est branché | Déverrouille l'écran. La demande d'appairage n'apparaît que sur un appareil déverrouillé, et elle expire. |
+| `iPhone détecté mais non appairé` | Touche **Se fier à cet ordinateur** sur le téléphone, puis saisis son code. |
+| L'outil s'arrête en cours de route | Le câble a bougé. Rien ne reste à moitié supprimé : les fichiers sont copiés avant d'être retirés. Rebranche et relance. |
+| La sortie est dans la mauvaise langue | `ipsd lang fr` ou `ipsd lang en`. |
+
+À savoir : `ipsd doctor` parcourt des dizaines de milliers de fichiers en USB et
+prend deux à trois minutes. `--profile fast` descend à une trentaine de
+secondes, avec un inventaire moins fin.
 
 ## Prérequis
 

@@ -69,6 +69,16 @@ which it can drive for you, with guardrails.
 
 ## Install
 
+### Recommended: the install script
+
+```bash
+git clone https://github.com/OWNER/iphone-storage-doctor
+cd iphone-storage-doctor && ./install.sh
+```
+
+It checks that the Python it will use is 3.11 or newer — macOS still ships 3.9,
+which is the most common reason a plain `pip3 install` fails.
+
 ### Homebrew
 
 ```bash
@@ -184,6 +194,22 @@ On an older device the real factor is the battery. Once health drops below
 80 %, iOS caps peak CPU frequency to avoid unexpected shutdowns. That is why
 `ipsd battery` exists, and why this project will not sell you a speed-up in
 exchange for deleting files.
+
+
+## Troubleshooting
+
+| Symptom | Cause and fix |
+|---|---|
+| `requires a different Python: 3.9.x not in '>=3.11'` | macOS ships Python 3.9. Use `./install.sh` or pipx, which bring their own interpreter — not `pip3 install`. |
+| `command not found: ipsd` | pipx installed it outside your PATH. Run `pipx ensurepath`, then open a new terminal. |
+| `No iPhone detected` while it is plugged in | Unlock the screen. The pairing prompt only appears on an unlocked device, and it times out. |
+| `iPhone detected but not paired` | Tap **Trust This Computer** on the phone, then enter its passcode. |
+| The tool stops mid-run | The cable came loose. Nothing is left half-deleted: quarantined files are copied before removal. Plug back in and re-run. |
+| Output is in the wrong language | `ipsd lang en` or `ipsd lang fr`. |
+
+Note: `ipsd doctor` walks tens of thousands of files over USB and takes two to
+three minutes. `--profile fast` cuts that to about thirty seconds with a
+coarser inventory.
 
 ## Requirements
 
