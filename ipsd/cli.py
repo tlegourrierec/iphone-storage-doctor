@@ -73,6 +73,21 @@ from .units import human
 err = Console(stderr=True)
 
 
+NOISY = (BrokenPipeError, ConnectionError, TimeoutError, asyncio.CancelledError)
+
+
+def _quiet_asyncio(loop, context) -> None:
+    """Étouffe le bruit d'asyncio quand le lien USB tombe.
+
+    pymobiledevice3 laisse des futures non récupérés derrière lui ; à la
+    fermeture de la boucle, asyncio les affiche en clair. L'utilisateur a déjà
+    reçu un message explicite : inutile de lui servir une trace en plus.
+    """
+    if isinstance(context.get("exception"), NOISY):
+        return
+    loop.default_exception_handler(context)
+
+
 def coro(fn):
     """Adapte une commande asynchrone à click.
 
@@ -82,8 +97,12 @@ def coro(fn):
 
     @functools.wraps(fn)
     def wrapper(*args, **kwargs):
+        async def runner():
+            asyncio.get_running_loop().set_exception_handler(_quiet_asyncio)
+            return await fn(*args, **kwargs)
+
         try:
-            return asyncio.run(fn(*args, **kwargs))
+            return asyncio.run(runner())
         except DeviceError as exc:
             err.print(f"[bold red]✗[/bold red] {exc}")
             sys.exit(2)
@@ -254,6 +273,9 @@ async def doctor(udid, as_json, profile, no_apps, no_media):
         findings += analyse_apps(app_list)
 
     if not no_media:
+        # L'énumération des apps est longue ; sur certains iOS la session
+        # lockdown ne lui survit pas. On repart d'une connexion neuve.
+        lockdown = await connect(udid)
         async with MediaScanner(lockdown, profile=profile) as scanner:
             with console.status(t("cli.status.media")) as status:
 

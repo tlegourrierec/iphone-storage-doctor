@@ -210,6 +210,7 @@ exchange for deleting files.
 | `No iPhone detected` while it is plugged in | Unlock the screen. The pairing prompt only appears on an unlocked device, and it times out. |
 | `iPhone detected but not paired` | Tap **Trust This Computer** on the phone, then enter its passcode. |
 | Still "not paired" after tapping Trust, or the dialog never appears | The device remembers a previous refusal. Unplug and replug while unlocked. If that fails: **Settings › General › Transfer or Reset iPhone › Reset › Reset Location & Privacy**, then replug. That clears the list of refused computers and nothing else. |
+| `The USB link dropped mid-operation` | Most often a second `ipsd` running at the same time: usbmuxd does not handle concurrent sessions on one device. Wait for the first to finish. Otherwise keep the phone unlocked and plug it straight into the Mac, not through a hub. |
 | The tool stops mid-run | The cable came loose. Nothing is left half-deleted: quarantined files are copied before removal. Plug back in and re-run. |
 | Output is in the wrong language | `ipsd lang en` or `ipsd lang fr`. |
 | `brew install` says Command Line Tools are too outdated | Homebrew builds from source and needs current CLT: `sudo rm -rf /Library/Developer/CommandLineTools && sudo xcode-select --install`. Or use `./install.sh`, which needs no compiler. |
