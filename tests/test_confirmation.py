@@ -1,4 +1,6 @@
 """Le consentement ne doit jamais pouvoir être contourné par accident."""
+import pytest
+
 import ipsd.cli as cli
 
 
@@ -51,3 +53,20 @@ def test_prompt_defaults_to_no(monkeypatch):
     monkeypatch.setattr(cli.click, "confirm", fake_confirm)
     assert cli.confirm_deletion("caches", 4, "270 Mo", assume_yes=False) is False
     assert seen["default"] is False
+
+
+def test_socket_errors_are_translated_not_dumped(monkeypatch, capsys):
+    """Un câble qui lâche ne doit jamais produire une trace Python."""
+
+    import ipsd.cli as cli
+
+    @cli.coro
+    async def boom():
+        raise BrokenPipeError(32, "Broken pipe")
+
+    with pytest.raises(SystemExit) as exit_info:
+        boom()
+    assert exit_info.value.code == 2
+    printed = capsys.readouterr()
+    assert "Traceback" not in printed.out + printed.err
+    assert "BrokenPipeError" in printed.out + printed.err

@@ -90,6 +90,12 @@ def coro(fn):
         except DeviceNotFoundError:
             err.print("[bold red]✗[/bold red] " + t("device.disconnected"))
             sys.exit(2)
+        except (BrokenPipeError, ConnectionError, TimeoutError) as exc:
+            # Le lien USB a lâché en cours d'échange : câble, veille de
+            # l'appareil, ou session lockdown fermée par iOS.
+            err.print("[bold red]✗[/bold red] " + t("device.link_lost"))
+            err.print(f"[dim]{type(exc).__name__}[/dim]")
+            sys.exit(2)
         except PyMobileDevice3Exception as exc:
             err.print(
                 "[bold red]✗[/bold red] "

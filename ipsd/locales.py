@@ -665,4 +665,14 @@ MESSAGES: dict[str, dict[str, str]] = {
         "fr": "Red\u00e9marrer l'iPhone maintenant ?",
     },
     "cli.restart.done": {"en": "Restart requested.", "fr": "Red\u00e9marrage demand\u00e9."},
+    "device.link_lost": {
+        "en": "The USB link dropped mid-operation.\n"
+              "  Usually the cable, the device going to sleep, or iOS closing "
+              "the session. Keep the iPhone unlocked, plug it straight into "
+              "the Mac rather than through a hub, and run the command again.",
+        "fr": "Le lien USB a l\u00e2ch\u00e9 en cours d'op\u00e9ration.\n"
+              "  En g\u00e9n\u00e9ral le c\u00e2ble, la mise en veille de l'appareil, ou iOS qui "
+              "ferme la session. Garde l'iPhone d\u00e9verrouill\u00e9, branche-le "
+              "directement sur le Mac plut\u00f4t que sur un hub, et relance.",
+    },
 }
