@@ -1,19 +1,19 @@
 class IphoneStorageDoctor < Formula
   include Language::Python::Virtualenv
 
-  desc "Analyse le stockage d'un iPhone branché en USB et récupère de l'espace"
-  homepage "https://github.com/tlegourrierec/iphone-storage-doctor"
-  url "file:///Users/thomaslegourrierec/Downloads/iphone-storage-doctor"
-  version "1.0.0"
+  desc "Diagnose iPhone storage and battery health over USB"
+  homepage "https://github.com/OWNER/iphone-storage-doctor"
+  url "https://github.com/OWNER/iphone-storage-doctor/archive/refs/tags/v1.1.0.tar.gz"
+  # Remplacer par : shasum -a 256 de l'archive publiée par GitHub.
+  sha256 "REPLACE_WITH_RELEASE_TARBALL_SHA256"
   license "MIT"
 
   depends_on "python@3.13"
-  depends_on "libimobiledevice" => :recommended
 
   def install
-    venv = virtualenv_create(libexec, "python3.13")
-    # pymobiledevice3 n'est pas dans homebrew-core : on laisse pip résoudre
-    # l'arbre de dépendances dans le venv isolé de la formule.
+    virtualenv_create(libexec, "python3.13")
+    # pymobiledevice3 n'est pas dans homebrew-core et tire un arbre de
+    # dépendances profond : on laisse pip le résoudre dans le venv isolé.
     system libexec/"bin/pip", "install", "--no-cache-dir", buildpath
     bin.install_symlink libexec/"bin/ipsd"
     bin.install_symlink libexec/"bin/iphone-storage-doctor"
@@ -21,20 +21,18 @@ class IphoneStorageDoctor < Formula
 
   def caveats
     <<~EOS
-      Branche l'iPhone en USB, déverrouille-le et accepte « Se fier à cet
-      ordinateur », puis lance :
+      Plug in the iPhone, unlock it and tap "Trust This Computer", then run:
 
         ipsd doctor
 
-      Le nettoyage est en simulation par défaut ; « ipsd clean --apply »
-      exécute réellement, après avoir copié les fichiers sur le Mac.
+      Cleaning is a dry run by default. "ipsd clean --apply" executes, after
+      copying every file to the Mac first.
     EOS
   end
 
   test do
-    assert_match "1.0.0", shell_output("#{bin}/ipsd --version")
-    # Sans appareil branché, la commande doit échouer proprement (code 2)
-    # et non planter sur une trace Python.
+    assert_match version.to_s, shell_output("#{bin}/ipsd --version")
+    # With no device attached the CLI must fail cleanly (exit 2), not traceback.
     output = shell_output("#{bin}/ipsd storage 2>&1", 2)
     refute_match "Traceback", output
   end

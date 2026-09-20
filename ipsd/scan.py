@@ -6,9 +6,9 @@ les données d'apps sont hors de portée et sont mesurées par ipsd.apps.
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Callable, Iterable
 
 from pymobiledevice3.services.afc import AfcService
 
@@ -81,7 +81,7 @@ class MediaScanner:
         self.max_files = max_files
         self._afc: AfcService | None = None
 
-    async def __aenter__(self) -> "MediaScanner":
+    async def __aenter__(self) -> MediaScanner:
         self._afc = AfcService(self.lockdown)
         return self
 

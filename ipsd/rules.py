@@ -52,11 +52,11 @@ class Finding:
         return (_ORDER.get(self.tier, 3), -self.bytes)
 
 
-def _sum(files: list["FileEntry"]) -> int:
+def _sum(files: list[FileEntry]) -> int:
     return sum(f.size for f in files)
 
 
-def _under(files: list["FileEntry"], *prefixes: str) -> list["FileEntry"]:
+def _under(files: list[FileEntry], *prefixes: str) -> list[FileEntry]:
     return [f for f in files if f.path.startswith(prefixes)]
 
 
@@ -250,7 +250,7 @@ MEDIA_RULES = (
 )
 
 
-def analyse_media(scan: "ScanResult", **options) -> list[Finding]:
+def analyse_media(scan: ScanResult, **options) -> list[Finding]:
     findings = []
     for rule in MEDIA_RULES:
         try:
@@ -267,7 +267,7 @@ def analyse_media(scan: "ScanResult", **options) -> list[Finding]:
 # --------------------------------------------------------------------------
 
 def analyse_apps(
-    apps: list["AppUsage"],
+    apps: list[AppUsage],
     bloat_ratio: float = 0.55,
     min_data: int = 300_000_000,
 ) -> list[Finding]:

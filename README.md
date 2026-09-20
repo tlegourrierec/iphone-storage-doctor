@@ -1,151 +1,162 @@
 # iphone-storage-doctor
 
-Analyse le stockage d'un iPhone **branché en USB** depuis un Mac, explique où part
-la place, et récupère ce qui est récupérable — sans jailbreak, sans application à
-installer sur le téléphone.
+**Understand where your iPhone's storage actually went — and why an old iPhone
+feels slow.** Runs on your Mac over a USB cable. No jailbreak, no app on the
+phone, no account, nothing leaves your machine.
 
+[![CI](https://github.com/OWNER/iphone-storage-doctor/actions/workflows/ci.yml/badge.svg)](https://github.com/OWNER/iphone-storage-doctor/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](pyproject.toml)
+
+*[Version française](README.fr.md)*
+
+```console
+$ ipsd battery
+ Health        74.4 %   2288 / 3076 mAh
+ Cycles        1431     286 % of the 500 cycles Apple rates this model for
+ Charge        71 %
+ Temperature   39.9 °C
+
+╭──────────────────────────────────────────────────────────────────────────╮
+│ Worn battery. This is the number one cause of slowness on an older       │
+│ device: iOS throttles the CPU to prevent shutdowns. Replacing the        │
+│ battery buys back more performance than any amount of file cleaning.     │
+╰──────────────────────────────────────────────────────────────────────────╯
 ```
-ipsd doctor
-```
 
-## Ce que l'outil fait vraiment
+## Why this exists
 
-Il n'y a pas de magie possible sur iOS, et cet outil est construit autour de cette
-contrainte plutôt qu'en la cachant. Trois sources d'information sont exploitées :
+Every "iPhone cleaner" promises to make your phone fast again by deleting
+files. That promise is false, and the tools that make it are guessing at
+numbers they cannot measure. This project does three things differently.
 
-| Source | Ce qu'elle donne | Portée |
+**1. It answers the performance question honestly.** A slow old iPhone is
+almost never a storage problem — it is a worn battery triggering iOS
+performance management. `ipsd battery` computes real health from the charge
+controller's own counters (`NominalChargeCapacity / DesignCapacity`), without
+the rounding Settings applies, and reports cycle count against the rating for
+your specific model. No other storage tool reports this.
+
+**2. It shows the gap instead of filling it with a guess.** Three iOS services
+can be queried over USB. Together they do not account for the whole disk. The
+difference is labelled *unattributed*, with the reason — rather than smeared
+across a pie chart so it adds up to 100 %.
+
+| Source | What it gives | Scope |
 |---|---|---|
-| `com.apple.disk_usage` | Capacité, occupé, libre immédiat, purgeable | Tout le disque |
-| `installation_proxy` | Poids **code + données** de chaque app | Toutes les apps |
-| `AFC` | Inventaire fichier par fichier | `/var/mobile/Media` seulement |
+| `com.apple.disk_usage` | Capacity, used, free, purgeable | Whole disk |
+| `installation_proxy` | Binary + data size, per app | Every app |
+| `AFC` | File-by-file inventory | `/var/mobile/Media` only |
+| — | **Everything else** | **Reported as unattributed** |
 
-La somme des deux dernières ne couvre pas le total : le reste (iOS lui-même, les
-caches système, iCloud) est affiché tel quel, sous l'étiquette **« non attribué »**.
-L'outil préfère afficher un trou honnête plutôt qu'un camembert inventé.
+**3. It refuses to delete what it should not.** See [Safety model](#safety-model).
 
-### Ce que l'outil ne peut pas faire
+## What it cannot do (verified, not assumed)
 
-**Vider le cache d'une app depuis le Mac est impossible.** Les données d'Instagram,
-TikTok ou Spotify vivent dans `/var/mobile/Containers/Data/Application/<UUID>/`,
-hors de portée d'AFC. Le service `house_arrest` est refusé par iOS pour les apps
-de l'App Store (`InstallationLookupFailed`). Aucun logiciel Mac ne contourne ça —
-c'est le sandbox iOS, pas une limite d'implémentation.
+Honesty about limits is the point of this project, so these were tested by
+direct calls against a real device rather than inferred:
 
-En revanche l'outil **mesure** ces caches et te dit quoi faire :
-
-| Action | Gain typique |
+| Attempt | Result |
 |---|---|
-| Vider le cache depuis les réglages de l'app | partiel |
-| Supprimer puis réinstaller l'app | la totalité des données |
-| « Décharger l'app » | le binaire seulement — **pas** les données |
+| Read an App Store app's cache container (`house_arrest`) | **Refused** — `InstallationLookupFailed` |
+| Read storage keys via `mobilegestalt` | **Refused** — `DeprecationError` (closed since iOS 17) |
+| Decompose the "purgeable" figure | **Impossible** — `NANDInfo` is flash-controller telemetry, not a breakdown |
 
-C'est ce que fait `ipsd purge` : il chiffre le gain app par app, puis pilote la
-désinstallation depuis le Mac. Le binaire se retéléchargera depuis l'App Store.
+So: **no Mac-side tool can clear Instagram's cache.** That is the iOS sandbox,
+not a missing feature. What this tool does instead is *measure* those caches
+and tell you the only action that actually frees them — uninstalling the app,
+which it can drive for you, with guardrails.
 
-```bash
-ipsd purge --min-data 400     # simulation : qui pèse, et combien on récupère
-ipsd purge --app TikTok --apply
-```
-
-**Garde-fou.** Désinstaller efface aussi les données locales. L'outil reconnaît
-les catégories où c'est irrécupérable — applications d'authentification à deux
-facteurs, messageries, portefeuilles crypto, éditeurs photo, prises de notes —
-et les **écarte par défaut**, en affichant la raison. `--force-risky` passe
-outre, délibérément. En conditions réelles ce filtre a épargné un Microsoft
-Authenticator et un Lightroom porteur d'1 Go de projets locaux.
-
-`--apply` exige en plus de taper `SUPPRIMER`, et l'outil mesure l'espace libre
-avant/après pour confirmer le gain réel plutôt que l'estimation.
-
-## Installation
+## Install
 
 ### Homebrew
 
 ```bash
-brew install --formula ./Formula/iphone-storage-doctor.rb
+brew tap OWNER/tap
+brew install iphone-storage-doctor
 ```
 
-### pipx (plus rapide)
+### pipx
 
 ```bash
-./install.sh
+pipx install git+https://github.com/OWNER/iphone-storage-doctor
 ```
 
-## Utilisation
+Plug in the iPhone, unlock it, tap **Trust This Computer**, then run `ipsd doctor`.
 
-```bash
-ipsd devices     # vérifier que l'iPhone est vu
-ipsd storage     # compteurs, instantané
-ipsd doctor      # diagnostic complet (~2-3 min, parcourt le volume média)
-ipsd apps        # classement des apps par espace occupé
-ipsd clean       # simulation de nettoyage
-ipsd clean --apply --crash   # exécution réelle
-ipsd purge       # apps désinstallables, avec le gain chiffré
-ipsd purgeable   # ce qu'iOS appelle « libérable », et pourquoi on n'y touche pas
-ipsd trend       # dérive du stockage entre deux instantanés
-ipsd restart     # redémarre l'iPhone
-```
+## Commands
 
-Toutes les commandes acceptent `--json` pour être branchées sur autre chose.
+| Command | What it does |
+|---|---|
+| `ipsd doctor` | Full diagnosis: storage breakdown, battery, findings |
+| `ipsd battery` | Real battery health and throttling verdict |
+| `ipsd storage` | Counters only, instant |
+| `ipsd apps` | Every app ranked by space, binary vs data |
+| `ipsd purgeable` | What iOS calls "purgeable", and why not to chase it |
+| `ipsd clean` | Delete files classified SAFE (dry run by default) |
+| `ipsd purge` | Uninstall apps to reclaim their cache, with guardrails |
+| `ipsd trend` | What grew since the last snapshot |
+| `ipsd restart` | Reboot the device |
 
-### Profils de scan
+Every command takes `--json`.
 
-`ipsd doctor --profile fast` ignore les sous-arbres les plus peuplés de la
-photothèque. Compte ~30 s au lieu de ~2-3 min, avec un inventaire moins fin.
+## Safety model
 
-## Le modèle de sûreté
+Findings carry one of three levels, and the tool only ever deletes the first:
 
-Chaque constat porte un niveau, et l'outil ne supprime **que** le premier :
+- **SAFE** — cache iOS regenerates. Deleted by `ipsd clean --apply`, after
+  being copied to the Mac first.
+- **REVIEW** — reclaimable, but it is your call. Offline music, podcasts,
+  large apps. Never touched automatically.
+- **MANUAL** — never touched. User data, or a deletion that would corrupt an
+  iOS database.
 
-- **SÛR** — cache régénéré par iOS, aucune donnée utilisateur. Supprimé par
-  `ipsd clean --apply`, après copie sur le Mac.
-- **À ARBITRER** — récupérable, mais c'est un choix : musique hors-ligne,
-  podcasts, apps volumineuses. Jamais supprimé automatiquement.
-- **MANUEL** — jamais touché. Données utilisateur, ou suppression qui
-  corromprait une base iOS.
+### The rule with no exception
 
-### La règle qui compte
+**Nothing under `/DCIM` or `/PhotoData` is ever deletable by this tool.**
 
-**Tout ce qui est sous `/DCIM` et `/PhotoData` est classé MANUEL.**
+Deleting a photo over AFC removes the file but leaves its row in
+`Photos.sqlite`: inconsistent library, ghost thumbnails, iCloud sync drift.
+Photos are deleted from the Photos app. A unit test enforces this, and it
+would fail if someone changed the behaviour.
 
-Supprimer une photo via AFC retire le fichier mais laisse son entrée dans
-`Photos.sqlite` : bibliothèque incohérente, vignettes fantômes, synchronisation
-iCloud qui part en vrille. Les photos se suppriment depuis l'app Photos, et
-l'outil refuse de faire autrement — même quand la place à gagner est tentante.
+### Uninstall guardrails
 
-Même logique pour les vignettes `.ithmb` : techniquement supprimables, mais iOS
-les reconstruit en chauffant le téléphone pendant des heures, sans gain durable.
-Elles sont signalées, pas supprimées.
+`ipsd purge` is the only way to reclaim an app's cache, and it destroys that
+app's local data. The tool recognises the categories where that loss is
+unrecoverable and **excludes them by default**, showing the reason:
 
-### Quarantaine
+- two-factor authenticator apps — you can lock yourself out of your accounts
+- messengers with local history
+- crypto wallets holding local keys
+- photo editors with unsynced projects
+- note-taking apps
 
-`ipsd clean --apply` copie chaque fichier dans `~/iphone-storage-doctor/quarantine`
-**avant** de l'effacer. `--no-quarantine` désactive ce filet, explicitement.
+`--force-risky` overrides this, deliberately. `--apply` additionally requires
+typing a confirmation word, and free space is measured before and after so you
+see the real gain rather than the estimate.
 
-## Performance de l'appareil
+## Performance: what is true
 
-Libérer de l'espace n'accélère un iPhone que dans un cas : quand il est proche
-de la saturation (sous ~10 % de libre), le système APFS n'a plus de marge et
-tout ralentit. Au-delà, passer de 30 à 50 Go libres ne change rien à la vitesse.
-`ipsd restart` vide la RAM et les fichiers temporaires — effet réel mais bref.
-L'outil ne promet pas mieux.
+Freeing space speeds up an iPhone in exactly one case: below roughly 10 % free,
+APFS runs out of room to work and everything slows down. Above that, going from
+30 GB free to 50 GB free changes nothing.
 
-## Prérequis
+On an older device the real factor is the battery. Once health drops below
+80 %, iOS caps peak CPU frequency to avoid unexpected shutdowns. That is why
+`ipsd battery` exists, and why this project will not sell you a speed-up in
+exchange for deleting files.
 
-- macOS, Python ≥ 3.11
-- iPhone branché en USB, déverrouillé, appairé (« Se fier à cet ordinateur »)
-- Aucun mode développeur requis
+## Requirements
 
-## Développement
+macOS, Python 3.11+, an iPhone connected over USB and paired. No developer
+mode required. Built on [pymobiledevice3](https://github.com/doronz88/pymobiledevice3).
 
-```bash
-python3 -m venv .venv && ./.venv/bin/pip install -e . pytest
-./.venv/bin/python -m pytest tests -q
-```
+## Contributing
 
-Les tests couvrent les heuristiques sans appareil branché — notamment le
-garde-fou qui interdit de classer un fichier `/DCIM` comme supprimable.
+See [CONTRIBUTING.md](CONTRIBUTING.md). Device compatibility reports are real
+contributions — iOS changes which services answer between releases.
 
-## Licence
+## License
 
 MIT

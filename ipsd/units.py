@@ -1,7 +1,7 @@
 """Formatage et petites conversions partagées."""
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 _UNITS = ("o", "Ko", "Mo", "Go", "To")
 
@@ -19,7 +19,7 @@ def human(size: float) -> str:
 
 
 def now() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 def as_aware(dt: datetime | None) -> datetime | None:
@@ -27,7 +27,7 @@ def as_aware(dt: datetime | None) -> datetime | None:
     if dt is None:
         return None
     if dt.tzinfo is None:
-        return dt.replace(tzinfo=timezone.utc)
+        return dt.replace(tzinfo=UTC)
     return dt
 
 

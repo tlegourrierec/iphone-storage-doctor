@@ -13,16 +13,35 @@ import sys
 from pathlib import Path
 
 import click
+from pymobiledevice3.exceptions import (
+    DeviceNotFoundError,
+    PyMobileDevice3Exception,
+)
 from rich.console import Console
+from rich.panel import Panel
+from rich.rule import Rule
 from rich.table import Table
 from rich.text import Text
 
 from . import (
     __version__,
+)
+from . import (
     apps as apps_mod,
+)
+from . import (
+    battery as battery_mod,
+)
+from . import (
     clean as clean_mod,
+)
+from . import (
     crash as crash_mod,
+)
+from . import (
     history as history_mod,
+)
+from . import (
     purge as purge_mod,
 )
 from .device import DeviceError, connect, get_disk_usage, get_info
@@ -42,7 +61,11 @@ err = Console(stderr=True)
 
 
 def coro(fn):
-    """Adapte une commande asynchrone à click."""
+    """Adapte une commande asynchrone à click.
+
+    Une opération longue survit rarement au débranchement du câble. Plutôt
+    qu'une trace Python, on dit ce qui s'est passé et ce qui a déjà été fait.
+    """
 
     @functools.wraps(fn)
     def wrapper(*args, **kwargs):
@@ -50,6 +73,22 @@ def coro(fn):
             return asyncio.run(fn(*args, **kwargs))
         except DeviceError as exc:
             err.print(f"[bold red]✗[/bold red] {exc}")
+            sys.exit(2)
+        except DeviceNotFoundError:
+            err.print(
+                "[bold red]✗[/bold red] L'iPhone a été déconnecté pendant "
+                "l'opération.\n"
+                "  Rebranche-le, déverrouille-le, puis relance la commande. "
+                "Ce qui a déjà été traité l'est définitivement ; le reste ne "
+                "l'a pas été."
+            )
+            sys.exit(2)
+        except PyMobileDevice3Exception as exc:
+            err.print(
+                f"[bold red]✗[/bold red] L'appareil a refusé une opération : "
+                f"{type(exc).__name__}.\n"
+                "  Vérifie qu'il est déverrouillé et appairé, puis réessaie."
+            )
             sys.exit(2)
         except KeyboardInterrupt:
             err.print("\n[yellow]Interrompu.[/yellow]")
@@ -146,6 +185,8 @@ async def doctor(udid, as_json, profile, no_apps, no_media):
         media_bytes = scan.total_size
         findings += analyse_media(scan)
 
+    health = await battery_mod.collect(lockdown, info.product_type)
+
     try:
         crashes = await crash_mod.collect(lockdown)
         findings += analyse_crashes(crashes)
@@ -163,6 +204,7 @@ async def doctor(udid, as_json, profile, no_apps, no_media):
                     "disk": disk,
                     "media_bytes": media_bytes,
                     "apps_bytes": apps_bytes,
+                    "battery": health,
                     "findings": findings,
                     "apps": app_list[:50],
                 }
@@ -172,6 +214,17 @@ async def doctor(udid, as_json, profile, no_apps, no_media):
 
     device_panel(info, disk)
     storage_table(disk, media_bytes=media_bytes, apps_bytes=apps_bytes)
+    if health is not None:
+        colour = {
+            battery_mod.HEALTHY: "green",
+            battery_mod.AGING: "yellow",
+            battery_mod.WORN: "red",
+        }[health.state]
+        console.print()
+        console.print(
+            f"Batterie : [bold {colour}]{health.health_percent:.0f} %[/bold {colour}] "
+            f"de santé, {health.cycle_count} cycles. [dim]{health.verdict()}[/dim]"
+        )
     console.print()
     findings_table(findings)
     if app_list:
@@ -392,6 +445,175 @@ async def restart(udid, yes):
     async with DiagnosticsService(lockdown) as diag:
         await diag.restart()
     console.print("[green]✓[/green] Redémarrage demandé.")
+
+
+@main.command()
+@udid_option
+@click.option("--apply", "do_apply", is_flag=True, help="Exécute réellement le nettoyage.")
+@click.option("--no-quarantine", is_flag=True, help="Supprime sans copier sur le Mac.")
+@coro
+async def boost(udid, do_apply, no_quarantine):
+    """Relevé avant, nettoyage sûr, relevé après. Le bilan complet en une commande."""
+    lockdown = await connect(udid)
+    info = await get_info(lockdown)
+
+    before = await get_disk_usage(lockdown)
+    health = await battery_mod.collect(lockdown, info.product_type)
+    crashes_before = await crash_mod.collect(lockdown)
+
+    device_panel(info, before)
+    console.print(Rule("[bold]Avant[/bold]", style="dim"))
+    before_tbl = Table(show_edge=False, show_header=False, box=None)
+    before_tbl.add_row("Espace libre", f"[bold]{human(before.free)}[/bold]")
+    before_tbl.add_row("Espace occupé", human(before.data_used))
+    if health is not None:
+        colour = {
+            battery_mod.HEALTHY: "green",
+            battery_mod.AGING: "yellow",
+            battery_mod.WORN: "red",
+        }[health.state]
+        before_tbl.add_row(
+            "Santé batterie",
+            f"[bold {colour}]{health.health_percent:.0f} %[/bold {colour}] "
+            f"[dim]({health.cycle_count} cycles)[/dim]",
+        )
+    before_tbl.add_row("Rapports de plantage", str(crashes_before.count))
+    console.print(before_tbl)
+
+    console.print()
+    console.print(Rule("[bold]Nettoyage[/bold]", style="dim"))
+    async with MediaScanner(lockdown, profile="deep") as scanner:
+        with console.status("Recherche des fichiers récupérables…") as status:
+
+            def progress(count, path):
+                status.update(f"Recherche… {count} fichiers examinés")
+
+            scan = await scanner.scan(on_progress=progress)
+    findings = [f for f in analyse_media(scan) if f.tier == SAFE]
+    sizes = {f.path: f.size for f in scan.files}
+    for f in clean_mod.selectable(findings):
+        console.print(f"  [green]•[/green] {f.title} — {human(f.bytes)} ({f.count} fichiers)")
+
+    report = await clean_mod.run(
+        lockdown,
+        findings,
+        dry_run=not do_apply,
+        quarantine=not no_quarantine,
+        sizes=sizes,
+    )
+    crash_bytes = 0
+    if do_apply and crashes_before.count:
+        dest = clean_mod.DEFAULT_QUARANTINE / "crash-reports"
+        crash_bytes = await crash_mod.archive_and_clear(lockdown, dest, erase=True)
+        console.print(
+            f"  [green]•[/green] Rapports de plantage — {crashes_before.count} "
+            f"archivés puis effacés"
+        )
+
+    if not do_apply:
+        console.print(
+            f"\n[yellow]Simulation.[/yellow] {report.planned} fichiers, "
+            f"[bold]{human(report.planned_bytes)}[/bold] seraient libérés."
+        )
+        console.print("[dim]Relance avec --apply pour exécuter.[/dim]")
+        return
+
+    after = await get_disk_usage(lockdown)
+    console.print()
+    console.print(Rule("[bold]Après[/bold]", style="dim"))
+
+    result = Table(show_edge=False, header_style="dim")
+    result.add_column("")
+    result.add_column("Avant", justify="right")
+    result.add_column("Après", justify="right")
+    result.add_column("Écart", justify="right")
+    delta_free = after.free - before.free
+    result.add_row(
+        "Espace libre",
+        human(before.free),
+        Text(human(after.free), style="bold"),
+        Text(
+            f"{'+' if delta_free >= 0 else '−'}{human(abs(delta_free))}",
+            style="green" if delta_free >= 0 else "red",
+        ),
+    )
+    result.add_row(
+        "Espace occupé",
+        human(before.data_used),
+        human(after.data_used),
+        human(abs(after.data_used - before.data_used)),
+    )
+    console.print(result)
+
+    console.print(
+        f"\n[green]✓[/green] {report.deleted} fichiers supprimés "
+        f"({human(report.deleted_bytes + crash_bytes)} de contenu retiré)."
+    )
+    if report.quarantine_dir:
+        console.print(f"[dim]Copie de sécurité : {report.quarantine_dir}[/dim]")
+    for failure in report.failures[:3]:
+        console.print(f"[red]✗[/red] {failure}")
+
+    console.print()
+    console.print(Rule("[bold]Ce qui reste à gagner[/bold]", style="dim"))
+    with console.status("Mesure des applications…"):
+        app_list = await apps_mod.collect(lockdown)
+    advice = sort_findings(analyse_apps(app_list))
+    for f in advice:
+        console.print(f"  [yellow]•[/yellow] [bold]{f.title}[/bold] — {human(f.bytes)}")
+        console.print(f"    [dim]{f.detail}[/dim]")
+    if health is not None and health.throttling_likely:
+        console.print(
+            f"\n  [red]•[/red] [bold]Batterie à {health.health_percent:.0f} %[/bold] — "
+            "c'est ce qui ralentit l'appareil, pas le stockage."
+        )
+        console.print(f"    [dim]{health.verdict()}[/dim]")
+
+
+@main.command()
+@udid_option
+@json_option
+@coro
+async def battery(udid, as_json):
+    """Santé réelle de la batterie — première cause de lenteur d'un appareil ancien."""
+    lockdown = await connect(udid)
+    info = await get_info(lockdown)
+    health = await battery_mod.collect(lockdown, info.product_type)
+    if health is None:
+        err.print("[yellow]![/yellow] Compteurs de batterie indisponibles sur cet appareil.")
+        sys.exit(1)
+    if as_json:
+        click.echo(to_json({"device": info, "battery": health}))
+        return
+
+    colour = {
+        battery_mod.HEALTHY: "green",
+        battery_mod.AGING: "yellow",
+        battery_mod.WORN: "red",
+    }[health.state]
+    table = Table(show_edge=False, show_header=False, box=None)
+    table.add_row(
+        "Santé",
+        Text(f"{health.health_percent:.1f} %", style=f"bold {colour}"),
+        f"[dim]{health.nominal_capacity} / {health.design_capacity} mAh[/dim]",
+    )
+    table.add_row(
+        "Cycles",
+        Text(str(health.cycle_count), style=f"bold {colour}"),
+        f"[dim]{health.cycles_ratio * 100:.0f} % des {health.rated_cycles} cycles "
+        "prévus par Apple[/dim]",
+    )
+    table.add_row("Charge", f"{health.charge_percent} %", "")
+    if health.temperature_c is not None:
+        table.add_row("Température", f"{health.temperature_c:.1f} °C", "")
+    console.print(table)
+    console.print()
+    console.print(Panel(health.verdict(), border_style=colour))
+    if health.throttling_likely:
+        console.print(
+            "\n[dim]Réglages > Batterie > État de la batterie indique si la "
+            "gestion des performances est active sur cet appareil.[/dim]"
+        )
 
 
 @main.command()

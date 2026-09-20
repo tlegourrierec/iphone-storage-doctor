@@ -1,10 +1,10 @@
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from ipsd.apps import AppUsage
 from ipsd.rules import MANUAL, SAFE, analyse_apps, analyse_media, sort_findings
 from ipsd.scan import FileEntry, ScanResult
 
-NOW = datetime.now(timezone.utc)
+NOW = datetime.now(UTC)
 
 
 def entry(path, size, days_old=1):

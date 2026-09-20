@@ -70,9 +70,10 @@ async def connect(udid: str | None = None):
     try:
         return await create_using_usbmux(serial=udid)
     except Exception as exc:  # noqa: BLE001 - on retraduit toutes les causes
+        # Le nom de la classe porte l'information quand le message est vide.
         detail = str(exc) or exc.__class__.__name__
-        low = detail.lower()
-        if "no device" in low or "not found" in low or "connectionfailed" in low:
+        low = f"{exc.__class__.__name__} {detail}".lower().replace("_", "")
+        if "nodevice" in low or "no device" in low or "notfound" in low or "not found" in low:
             raise DeviceError(
                 "Aucun iPhone détecté. Branche-le en USB, déverrouille-le, "
                 "et réponds « Se fier » à la demande d'appairage."

@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from ipsd.units import age_days, as_aware, human, pct
 
@@ -19,7 +19,7 @@ def test_as_aware_makes_naive_afc_dates_comparable():
 
 
 def test_age_days():
-    ref = datetime(2026, 9, 20, tzinfo=timezone.utc)
+    ref = datetime(2026, 9, 20, tzinfo=UTC)
     assert age_days(ref - timedelta(days=10), ref) == 10
     assert age_days(None) is None
 

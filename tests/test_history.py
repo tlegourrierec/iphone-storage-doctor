@@ -1,11 +1,11 @@
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from ipsd.history import Snapshot, diff, load_all, save
 
 
 def snap(days_ago, free, apps):
     return Snapshot(
-        taken_at=datetime.now(timezone.utc) - timedelta(days=days_ago),
+        taken_at=datetime.now(UTC) - timedelta(days=days_ago),
         udid="TESTUDID0001",
         free=free,
         used=100 - free,

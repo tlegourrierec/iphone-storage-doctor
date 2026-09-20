@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import asdict, is_dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from rich.console import Console
@@ -154,5 +154,5 @@ def _encode(obj: Any) -> Any:
 
 def to_json(payload: dict) -> str:
     payload = dict(payload)
-    payload.setdefault("generated_at", datetime.now(timezone.utc).isoformat())
+    payload.setdefault("generated_at", datetime.now(UTC).isoformat())
     return json.dumps(_encode(payload), indent=2, ensure_ascii=False)

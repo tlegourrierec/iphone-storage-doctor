@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 DEFAULT_DIR = Path.home() / "iphone-storage-doctor" / "snapshots"
@@ -31,7 +31,7 @@ class Snapshot:
         }
 
     @classmethod
-    def from_dict(cls, data: dict) -> "Snapshot":
+    def from_dict(cls, data: dict) -> Snapshot:
         return cls(
             taken_at=datetime.fromisoformat(data["taken_at"]),
             udid=data.get("udid", "?"),
@@ -77,7 +77,7 @@ def diff(old: Snapshot, new: Snapshot) -> list[tuple[str, int]]:
 
 def snapshot_from(udid: str, disk, apps) -> Snapshot:
     return Snapshot(
-        taken_at=datetime.now(timezone.utc),
+        taken_at=datetime.now(UTC),
         udid=udid,
         free=disk.free,
         used=disk.data_used,

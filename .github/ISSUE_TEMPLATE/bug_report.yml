@@ -1,0 +1,30 @@
+name: Bug report
+description: Something did not work as documented
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please run `ipsd storage --json` and paste the output below — it
+        identifies the model and iOS version without revealing personal data.
+  - type: input
+    id: version
+    attributes:
+      label: ipsd version
+      placeholder: "1.1.0"
+    validations:
+      required: true
+  - type: input
+    id: ios
+    attributes:
+      label: iPhone model and iOS version
+      placeholder: "iPhone14,2 — iOS 26.6.2"
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: Include the exact command and the full output.
+    validations:
+      required: true

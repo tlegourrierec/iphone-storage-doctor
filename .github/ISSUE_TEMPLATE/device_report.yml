@@ -1,0 +1,26 @@
+name: Device compatibility report
+description: Tell us the tool worked (or did not) on your model
+labels: [compatibility]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Compatibility reports are genuinely useful: iOS changes which services
+        answer, and we cannot test every model.
+  - type: input
+    id: device
+    attributes:
+      label: Model and iOS version
+      placeholder: "iPhone12,1 — iOS 18.5"
+    validations:
+      required: true
+  - type: checkboxes
+    id: commands
+    attributes:
+      label: Which commands worked
+      options:
+        - label: "ipsd storage"
+        - label: "ipsd doctor"
+        - label: "ipsd battery"
+        - label: "ipsd apps"
+        - label: "ipsd clean"
