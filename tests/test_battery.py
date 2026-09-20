@@ -1,6 +1,6 @@
-
 import pytest
 
+from ipsd.battery import AGING, HEALTHY, WORN, BatteryHealth, rated_cycles_for
 from ipsd.i18n import set_language
 
 
@@ -8,9 +8,6 @@ from ipsd.i18n import set_language
 def _french():
     """Ces tests vérifient le contenu des messages : on fixe la langue."""
     set_language("fr")
-
-
-from ipsd.battery import AGING, HEALTHY, WORN, BatteryHealth, rated_cycles_for
 
 
 def battery(design=3076, nominal=2288, cycles=1431, rated=500):

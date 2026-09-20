@@ -1,19 +1,14 @@
-
 import pytest
 
+from ipsd.apps import AppUsage
 from ipsd.i18n import set_language
+from ipsd.purge import candidates, risk_of, run, select
 
 
 @pytest.fixture(autouse=True)
 def _french():
     """Ces tests vérifient le contenu des messages : on fixe la langue."""
     set_language("fr")
-
-
-import pytest
-
-from ipsd.apps import AppUsage
-from ipsd.purge import candidates, risk_of, run, select
 
 
 def app(bundle, name, binary=100_000_000, data=500_000_000, kind="User"):

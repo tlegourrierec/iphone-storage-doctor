@@ -1,19 +1,25 @@
-
 import pytest
 
+from ipsd.actions import (
+    ADVANCED,
+    AUTO,
+    CHOICE,
+    EXTERNAL,
+    MAXIMUM,
+    SIMPLE,
+    build,
+    build_levels,
+)
+from ipsd.apps import AppUsage
+from ipsd.battery import BatteryHealth
 from ipsd.i18n import set_language
+from ipsd.rules import MANUAL, SAFE, Finding
 
 
 @pytest.fixture(autouse=True)
 def _french():
     """Ces tests vérifient le contenu des messages : on fixe la langue."""
     set_language("fr")
-
-
-from ipsd.actions import AUTO, CHOICE, EXTERNAL, build
-from ipsd.apps import AppUsage
-from ipsd.battery import BatteryHealth
-from ipsd.rules import MANUAL, SAFE, Finding
 
 
 def finding(key, tier=SAFE, size=100_000_000, paths=("/a.aea",)):
@@ -93,8 +99,6 @@ def test_actions_are_ordered_safest_first_then_by_gain():
 
 
 # --- les trois niveaux ------------------------------------------------------
-
-from ipsd.actions import ADVANCED, MAXIMUM, SIMPLE, build_levels  # noqa: E402
 
 
 def sample_apps():
