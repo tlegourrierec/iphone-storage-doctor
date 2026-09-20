@@ -1,8 +1,8 @@
 # iphone-storage-doctor
 
-**Understand where your iPhone's storage actually went — and why an old iPhone
-feels slow.** Runs on your Mac over a USB cable. No jailbreak, no app on the
-phone, no account, nothing leaves your machine.
+**Free up space on your iPhone from your Mac, and find out why an old iPhone
+feels slow.** Plug in a USB cable — no jailbreak, no app on the phone, no
+account, nothing leaves your machine.
 
 [![CI](https://github.com/tlegourrierec/iphone-storage-doctor/actions/workflows/ci.yml/badge.svg)](https://github.com/tlegourrierec/iphone-storage-doctor/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
@@ -10,12 +10,43 @@ phone, no account, nothing leaves your machine.
 
 *[Version française](README.fr.md)*
 
+<img src="docs/assets/demo.svg" alt="ipsd doctor lists what it can clean, how much each action reclaims, and how risky it is" width="100%">
+
+## Clean it
+
+`ipsd doctor` ends with a numbered plan: every action, what it reclaims, what
+it costs you, and the exact command. Nothing is a guess — the sizes come from
+the device itself.
+
+```bash
+ipsd plan                    # three levels, with what each one reclaims
+ipsd clean --apply --crash   # delete regenerable caches (asks first)
+ipsd boost --apply           # measure, clean, measure again
+```
+
+| Level | What it does | What it costs |
+|---|---|---|
+| **Simple** | Regenerable caches, crash reports | Nothing. iOS rebuilds them. |
+| **Advanced** | + reinstall the three most cache-bloated apps | Sign in again on those apps |
+| **Maximum** | + every re-downloadable app with no unique local data | Sign in again on each |
+
+**Nothing is deleted without you saying yes**, every file is copied to the Mac
+before it goes, and no level can touch your photos, iOS databases, or apps
+holding data you cannot get back. Those exclusions are enforced by tests, not
+by good intentions — see [Safety model](#safety-model).
+
+On the devices this was built against, `ipsd clean` freed 270 MB on one phone
+and 57 MB on another in seconds, and the plan surfaced 4–7 GB more sitting in
+app caches.
+
+## Then find out why it is slow
+
 ```console
 $ ipsd battery
- Health        74.4 %   2288 / 3076 mAh
- Cycles        1431     286 % of the 500 cycles Apple rates this model for
- Charge        71 %
- Temperature   39.9 °C
+ Health        79.2 %   2230 / 2815 mAh
+ Cycles        842      168 % of the 500 cycles Apple rates this model for
+ Charge        64 %
+ Temperature   31.4 °C
 
 ╭──────────────────────────────────────────────────────────────────────────╮
 │ Worn battery. This is the number one cause of slowness on an older       │
@@ -30,12 +61,10 @@ Every "iPhone cleaner" promises to make your phone fast again by deleting
 files. That promise is false, and the tools that make it are guessing at
 numbers they cannot measure. This project does three things differently.
 
-**1. It answers the performance question honestly.** A slow old iPhone is
-almost never a storage problem — it is a worn battery triggering iOS
-performance management. `ipsd battery` computes real health from the charge
-controller's own counters (`NominalChargeCapacity / DesignCapacity`), without
-the rounding Settings applies, and reports cycle count against the rating for
-your specific model. No other storage tool reports this.
+**1. It answers the performance question honestly.** Health is computed from
+the charge controller's own counters (`NominalChargeCapacity / DesignCapacity`),
+without the rounding Settings applies, and cycle count is compared against the
+rating for your specific model. No other storage tool reports this.
 
 **2. It shows the gap instead of filling it with a guess.** Three iOS services
 can be queried over USB. Together they do not account for the whole disk. The

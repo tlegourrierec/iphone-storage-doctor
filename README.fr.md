@@ -1,11 +1,56 @@
 # iphone-storage-doctor
 
-Analyse le stockage d'un iPhone **branché en USB** depuis un Mac, explique où part
-la place, et récupère ce qui est récupérable — sans jailbreak, sans application à
-installer sur le téléphone.
+**Libère de l'espace sur ton iPhone depuis ton Mac, et explique pourquoi un
+vieil iPhone rame.** Un câble USB suffit — sans jailbreak, sans application sur
+le téléphone, sans compte, et rien ne quitte ta machine.
 
+*[English version](README.md)*
+
+<img src="docs/assets/demo.svg" alt="ipsd doctor liste ce qu'il peut nettoyer, ce que chaque action rapporte et le risque associé" width="100%">
+
+## Nettoyer
+
+`ipsd doctor` se termine par un plan numéroté : chaque action, ce qu'elle
+rapporte, ce qu'elle coûte, et la commande exacte. Rien n'est estimé — les
+tailles viennent de l'appareil lui-même.
+
+```bash
+ipsd plan                    # les trois niveaux et leurs gains
+ipsd clean --apply --crash   # supprime les caches régénérables (demande avant)
+ipsd boost --apply           # relevé, nettoyage, relevé
 ```
-ipsd doctor
+
+| Niveau | Ce qu'il fait | Ce qu'il coûte |
+|---|---|---|
+| **Simple** | Caches régénérables, rapports de plantage | Rien. iOS les reconstruit. |
+| **Avancé** | + réinstallation des trois apps les plus gonflées | Reconnexion sur ces apps |
+| **Maximum** | + toutes les apps re-téléchargeables sans données locales uniques | Reconnexion sur chacune |
+
+**Rien n'est supprimé sans ton accord**, chaque fichier est copié sur le Mac
+avant d'être retiré, et aucun niveau ne peut toucher tes photos, les bases iOS
+ou une app porteuse de données irrécupérables. Ces exclusions sont verrouillées
+par des tests, pas par de bonnes intentions — voir [le modèle de
+sûreté](#le-modèle-de-sûreté).
+
+Sur les appareils qui ont servi à le construire, `ipsd clean` a libéré 270 Mo
+sur un téléphone et 57 Mo sur un autre en quelques secondes, et le plan a mis
+au jour 4 à 7 Go de plus dormant dans les caches d'applications.
+
+## Puis comprendre pourquoi il rame
+
+```console
+$ ipsd battery
+ Santé         79.2 %   2230 / 2815 mAh
+ Cycles        842      168 % des 500 cycles prévus par Apple
+ Charge        64 %
+ Température   31.4 °C
+
+╭──────────────────────────────────────────────────────────────────────────╮
+│ Batterie usée. C'est la première cause de lenteur sur un appareil        │
+│ ancien : iOS bride le processeur pour éviter les extinctions. Un         │
+│ remplacement de batterie rend plus de performance que n'importe quel     │
+│ nettoyage de fichiers.                                                   │
+╰──────────────────────────────────────────────────────────────────────────╯
 ```
 
 ## Ce que l'outil fait vraiment

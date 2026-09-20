@@ -10,7 +10,7 @@ def _french():
     set_language("fr")
 
 
-def battery(design=3076, nominal=2288, cycles=1431, rated=500):
+def battery(design=3000, nominal=2232, cycles=900, rated=500):
     return BatteryHealth(
         design_capacity=design,
         nominal_capacity=nominal,
@@ -34,14 +34,14 @@ def test_worn_battery_predicts_throttling():
 
 
 def test_healthy_battery_points_the_user_elsewhere():
-    fresh = battery(nominal=3000, cycles=120)
+    fresh = battery(nominal=2925, cycles=120)
     assert fresh.state == HEALTHY
     assert fresh.throttling_likely is False
     assert "vient d'ailleurs" in fresh.verdict()
 
 
 def test_aging_battery_sits_between_the_two():
-    aging = battery(nominal=2650, cycles=380)  # 86 %, 76 % des cycles
+    aging = battery(nominal=2580, cycles=380)  # 86 %, 76 % des cycles
     assert aging.state == AGING
 
 

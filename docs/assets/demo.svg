@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 860 460" width="860" height="460" role="img" aria-label="ipsd doctor output: an action plan listing caches to clean, apps to reinstall and a worn battery">
+  <defs>
+    <style>
+      .bg   { fill: #12131a; }
+      .t    { font-family: "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace; font-size: 14px; }
+      .dim  { fill: #7d8590; }
+      .fg   { fill: #e6edf3; }
+      .ok   { fill: #3fb950; }
+      .warn { fill: #d29922; }
+      .info { fill: #58a6ff; }
+      .b    { font-weight: 700; }
+    </style>
+  </defs>
+  <rect class="bg" width="860" height="460" rx="10"/>
+  <circle cx="24" cy="24" r="6" fill="#ff5f57"/>
+  <circle cx="44" cy="24" r="6" fill="#febc2e"/>
+  <circle cx="64" cy="24" r="6" fill="#28c840"/>
+
+  <text class="t dim" x="24" y="66">$</text>
+  <text class="t fg b" x="42" y="66">ipsd doctor</text>
+
+  <text class="t dim" x="24" y="98">──────────── What I can do right now ────────────</text>
+
+  <text class="t fg b" x="24" y="128"> 1. Clean regenerable caches</text>
+  <text class="t ok b"  x="330" y="128">1.2 GB</text>
+  <text class="t ok b"  x="420" y="128">NO RISK</text>
+  <text class="t dim"   x="48"  y="148">Analysis caches and crash reports. iOS rebuilds them on its own.</text>
+  <text class="t info b" x="48" y="168">ipsd clean --apply --crash</text>
+
+  <text class="t fg b" x="24" y="200"> 2. Reinstall Instagram</text>
+  <text class="t ok b"  x="330" y="200">4.1 GB</text>
+  <text class="t warn b" x="420" y="200">YOUR CALL</text>
+  <text class="t dim"   x="48"  y="220">Instagram carries 3.5 GB of data for 578 MB of code.</text>
+  <text class="t info b" x="48" y="240">ipsd purge --app com.burbn.instagram --apply</text>
+
+  <text class="t fg b" x="24" y="272"> 3. Reinstall TikTok</text>
+  <text class="t ok b"  x="330" y="272">2.2 GB</text>
+  <text class="t warn b" x="420" y="272">YOUR CALL</text>
+  <text class="t dim"   x="48"  y="292">TikTok carries 1.3 GB of data for 975 MB of code.</text>
+  <text class="t info b" x="48" y="312">ipsd purge --app com.zhiliaoapp.musically --apply</text>
+
+  <text class="t fg b" x="24" y="344"> 4. Have the battery replaced</text>
+  <text class="t dim"   x="330" y="344">—</text>
+  <text class="t info b" x="420" y="344">OUTSIDE THIS TOOL</text>
+  <text class="t dim"   x="48"  y="364">Health 79 %, 842 cycles. iOS throttles the CPU below 80 %.</text>
+  <text class="t dim"   x="48"  y="384">The only move that gives speed back. No file cleaning will.</text>
+
+  <text class="t ok b"   x="24"  y="424">Reclaimable with nothing lost: 1.2 GB</text>
+  <text class="t warn b" x="470" y="424">Total if you go all the way: 7.5 GB</text>
+</svg>

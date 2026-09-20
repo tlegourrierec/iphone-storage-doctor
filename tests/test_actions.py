@@ -30,8 +30,8 @@ def app(bundle, name, binary=100_000_000, data=2_000_000_000, kind="User"):
     return AppUsage(bundle, name, kind, binary, data)
 
 
-def battery(health=74.0, cycles=1431):
-    return BatteryHealth(3076, int(3076 * health / 100), cycles, 70, 40.0, 500)
+def battery(health=74.0, cycles=900):
+    return BatteryHealth(3000, int(3000 * health / 100), cycles, 70, 40.0, 500)
 
 
 class Disk:
