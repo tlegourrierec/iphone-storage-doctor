@@ -1,3 +1,3 @@
 """iphone-storage-doctor — diagnostic et nettoyage du stockage d'un iPhone en USB."""
 
-__version__ = "1.2.0"
+__version__ = "1.3.0"

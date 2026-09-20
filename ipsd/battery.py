@@ -14,6 +14,8 @@ from dataclasses import dataclass
 
 from pymobiledevice3.services.diagnostics import DiagnosticsService
 
+from .i18n import t
+
 # Cycles pour lesquels Apple garantit 80 % de capacité restante.
 # Les modèles à partir de l'iPhone 15 sont donnés pour 1000.
 RATED_CYCLES_LEGACY = 500
@@ -60,18 +62,10 @@ class BatteryHealth:
 
     def verdict(self) -> str:
         if self.state == WORN:
-            return (
-                "Batterie usée. C'est la première cause de lenteur sur un "
-                "appareil ancien : iOS bride le processeur pour éviter les "
-                "extinctions. Un remplacement de batterie rend plus de "
-                "performance que n'importe quel nettoyage de fichiers."
-            )
+            return t("battery.verdict.worn")
         if self.state == AGING:
-            return (
-                "Batterie vieillissante mais encore dans les clous. Surveille : "
-                "sous 80 % de santé, le bridage devient probable."
-            )
-        return "Batterie en bon état. La lenteur, s'il y en a, vient d'ailleurs."
+            return t("battery.verdict.aging")
+        return t("battery.verdict.healthy")
 
 
 def rated_cycles_for(product_type: str) -> int:

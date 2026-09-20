@@ -18,6 +18,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
+from .i18n import t
 from .units import age_days, human
 
 if TYPE_CHECKING:  # pragma: no cover
@@ -74,13 +75,12 @@ def rule_media_analysis(files, **_):
         return None
     return Finding(
         key="media_analysis_backup",
-        title="Sauvegardes d'analyse d'images",
+        title=t("rule.media_analysis.title"),
         tier=SAFE,
         bytes=size,
         count=len(backups),
-        detail="Copies de secours des bases d'analyse photo (OCR, scènes). "
-               "iOS les régénère en tâche de fond.",
-        action="Supprimable. L'analyse photo se refera à la prochaine charge.",
+        detail=t("rule.media_analysis.detail"),
+        action=t("rule.media_analysis.action"),
         paths=[f.path for f in backups],
     )
 
@@ -95,13 +95,12 @@ def rule_thumbnail_caches(files, **_):
         return None
     return Finding(
         key="photo_thumbnails",
-        title="Vignettes de la photothèque",
+        title=t("rule.thumbnails.title"),
         tier=MANUAL,
         bytes=size,
         count=len(thumbs),
-        detail=f"{human(size)} de vignettes pré-calculées.",
-        action="Ne pas supprimer à la main : iOS les reconstruit en chauffant "
-               "le téléphone pendant des heures, sans gain durable.",
+        detail=t("rule.thumbnails.detail", size=human(size)),
+        action=t("rule.thumbnails.action"),
     )
 
 
@@ -118,12 +117,12 @@ def rule_stale_downloads(files, max_age_days: int = 60, **_):
         return None
     return Finding(
         key="stale_downloads",
-        title="Téléchargements oubliés",
+        title=t("rule.downloads.title"),
         tier=SAFE,
         bytes=size,
         count=len(old),
-        detail=f"{len(old)} fichiers non touchés depuis plus de {max_age_days} jours.",
-        action="Supprimable.",
+        detail=t("rule.downloads.detail", count=len(old), days=max_age_days),
+        action=t("rule.deletable"),
         paths=[f.path for f in old],
     )
 
@@ -141,12 +140,12 @@ def rule_temp_files(files, **_):
     size = _sum(junk)
     return Finding(
         key="temp_files",
-        title="Fichiers temporaires",
+        title=t("rule.temp.title"),
         tier=SAFE,
         bytes=size,
         count=len(junk),
-        detail="Restes de transferts interrompus.",
-        action="Supprimable.",
+        detail=t("rule.temp.detail"),
+        action=t("rule.deletable"),
         paths=[f.path for f in junk],
     )
 
@@ -162,12 +161,12 @@ def rule_orphan_sidecars(files, **_):
         return None
     return Finding(
         key="orphan_sidecars",
-        title="Fichiers de retouche orphelins",
+        title=t("rule.sidecar.title"),
         tier=SAFE,
         bytes=_sum(orphans),
         count=len(orphans),
-        detail=f"{len(orphans)} fichiers .AAE dont la photo d'origine n'existe plus.",
-        action="Supprimable.",
+        detail=t("rule.sidecar.detail", count=len(orphans)),
+        action=t("rule.deletable"),
         paths=[f.path for f in orphans],
     )
 
@@ -182,14 +181,12 @@ def rule_offline_music(files, **_):
         return None
     return Finding(
         key="offline_music",
-        title="Musique téléchargée hors-ligne",
+        title=t("rule.music.title"),
         tier=REVIEW,
         bytes=size,
         count=len(music),
-        detail=f"{human(size)} d'audio stocké localement.",
-        action="Gain immédiat si tu streames : Réglages > Musique > "
-               "Téléchargements. Ne pas supprimer par AFC (casse la "
-               "bibliothèque) — passe par l'app Musique.",
+        detail=t("rule.music.detail", size=human(size)),
+        action=t("rule.music.action"),
     )
 
 
@@ -203,12 +200,12 @@ def rule_offline_video(files, **_):
         return None
     return Finding(
         key="offline_video",
-        title="Podcasts et achats téléchargés",
+        title=t("rule.video.title"),
         tier=REVIEW,
         bytes=size,
         count=len(vids),
-        detail=f"{human(size)} de contenu re-téléchargeable.",
-        action="À purger depuis l'app concernée.",
+        detail=t("rule.video.detail", size=human(size)),
+        action=t("rule.video.action"),
     )
 
 
@@ -226,14 +223,12 @@ def rule_big_old_videos(files, min_size: int = 50_000_000, min_age: int = 180, *
     size = _sum(vids)
     return Finding(
         key="big_old_videos",
-        title="Grosses vidéos anciennes",
+        title=t("rule.bigvideo.title"),
         tier=MANUAL,
         bytes=size,
         count=len(vids),
-        detail=f"{len(vids)} vidéos de plus de {human(min_size)}, "
-               f"vieilles de plus de {min_age // 30} mois.",
-        action="Copie-les sur le Mac (ipsd export) puis supprime-les depuis "
-               "l'app Photos — jamais par AFC.",
+        detail=t("rule.bigvideo.detail", count=len(vids), size=human(min_size), months=min_age // 30),
+        action=t("rule.bigvideo.action"),
         paths=[f.path for f in vids[:50]],
     )
 
@@ -288,13 +283,12 @@ def analyse_apps(
         findings.append(
             Finding(
                 key="app_cache_bloat",
-                title="Applications gonflées par leurs données",
+                title=t("rule.app_bloat.title"),
                 tier=REVIEW,
                 bytes=total,
                 count=len(bloated),
-                detail=f"{len(bloated)} apps où les données dépassent le code : {lines}.",
-                action="Vide le cache dans l'app, ou désinstalle/réinstalle : "
-                       "le binaire se retélécharge, le cache non.",
+                detail=t("rule.app_bloat.detail", count=len(bloated), list=lines),
+                action=t("rule.app_bloat.action"),
             )
         )
     heavy = [a for a in apps if a.total >= 1_000_000_000]
@@ -302,13 +296,12 @@ def analyse_apps(
         findings.append(
             Finding(
                 key="heavy_apps",
-                title="Applications de plus d'1 Go",
+                title=t("rule.heavy_apps.title"),
                 tier=REVIEW,
                 bytes=sum(a.total for a in heavy),
                 count=len(heavy),
                 detail=", ".join(f"{a.name} ({human(a.total)})" for a in heavy[:6]),
-                action="Décharge celles que tu n'ouvres plus : Réglages > "
-                       "Général > Stockage iPhone.",
+                action=t("rule.heavy_apps.action"),
             )
         )
     return findings
@@ -320,12 +313,12 @@ def analyse_crashes(summary, bytes_hint: int = 0) -> list[Finding]:
     return [
         Finding(
             key="crash_reports",
-            title="Rapports de plantage",
+            title=t("rule.crash.title"),
             tier=SAFE,
             bytes=bytes_hint or summary.count * 120_000,
             count=summary.count,
-            detail=f"{summary.count} rapports accumulés par iOS.",
-            action="« ipsd clean --crash » les archive sur le Mac puis les efface.",
+            detail=t("rule.crash.detail", count=summary.count),
+            action=t("rule.crash.action"),
         )
     ]
 

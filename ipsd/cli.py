@@ -48,6 +48,14 @@ from . import (
     purge as purge_mod,
 )
 from .device import DeviceError, connect, get_disk_usage, get_info
+from .i18n import (
+    SUPPORTED,
+    configured_language,
+    current,
+    save_language,
+    set_language,
+    t,
+)
 from .report import (
     action_plan,
     apps_table,
@@ -80,23 +88,16 @@ def coro(fn):
             err.print(f"[bold red]✗[/bold red] {exc}")
             sys.exit(2)
         except DeviceNotFoundError:
-            err.print(
-                "[bold red]✗[/bold red] L'iPhone a été déconnecté pendant "
-                "l'opération.\n"
-                "  Rebranche-le, déverrouille-le, puis relance la commande. "
-                "Ce qui a déjà été traité l'est définitivement ; le reste ne "
-                "l'a pas été."
-            )
+            err.print("[bold red]✗[/bold red] " + t("device.disconnected"))
             sys.exit(2)
         except PyMobileDevice3Exception as exc:
             err.print(
-                f"[bold red]✗[/bold red] L'appareil a refusé une opération : "
-                f"{type(exc).__name__}.\n"
-                "  Vérifie qu'il est déverrouillé et appairé, puis réessaie."
+                "[bold red]✗[/bold red] "
+                + t("device.refused", name=type(exc).__name__)
             )
             sys.exit(2)
         except KeyboardInterrupt:
-            err.print("\n[yellow]Interrompu.[/yellow]")
+            err.print("\n[yellow]" + t("cli.interrupted") + "[/yellow]")
             sys.exit(130)
 
     return wrapper
@@ -111,31 +112,75 @@ def confirm_deletion(what: str, count: int, size: str, assume_yes: bool) -> bool
     if assume_yes:
         return True
     if not sys.stdin.isatty():
-        err.print(
-            "[bold red]✗[/bold red] Suppression annulée : pas de terminal "
-            "interactif pour demander confirmation.\n"
-            "  Ajoute --yes si tu exécutes la commande depuis un script."
-        )
+        err.print("[bold red]✗[/bold red] " + t("cli.confirm.no_tty"))
         return False
     console.print(
-        f"\n[bold]{count} fichiers[/bold] ({size}) seront supprimés de "
-        f"l'iPhone : {what}."
+        "\n" + t("cli.confirm.header", count=count, size=size, what=what)
     )
-    console.print("[dim]Une copie est faite sur le Mac au préalable.[/dim]")
-    return click.confirm("Confirmer la suppression ?", default=False)
+    console.print("[dim]" + t("cli.confirm.copy_note") + "[/dim]")
+    return click.confirm(t("cli.confirm.question"), default=False)
 
 
-udid_option = click.option("--udid", default=None, help="Cible un appareil précis.")
-json_option = click.option("--json", "as_json", is_flag=True, help="Sortie JSON.")
+udid_option = click.option("--udid", default=None, help="Target a specific device.")
+json_option = click.option("--json", "as_json", is_flag=True, help="JSON output.")
+
+
+LANGUAGE_NAMES = {"en": "English", "fr": "Français"}
+
+
+def choose_language_once() -> None:
+    """Demande la langue au tout premier lancement, puis la mémorise.
+
+    Homebrew et pipx ne peuvent rien demander pendant l'installation : c'est
+    donc ici que ça se joue. Hors terminal, on se rabat silencieusement sur la
+    locale du système.
+    """
+    if configured_language() is not None or not sys.stdin.isatty():
+        return
+    options = list(SUPPORTED)
+    console.print()
+    console.print("[bold]Choose your language / Choisis ta langue[/bold]")
+    for index, code in enumerate(options, start=1):
+        console.print(f"  {index}. {LANGUAGE_NAMES[code]}")
+    answer = click.prompt(
+        "  ", type=click.IntRange(1, len(options)), default=1, show_default=False
+    )
+    chosen = options[answer - 1]
+    set_language(chosen)
+    save_language(chosen)
+    console.print("[green]OK[/green] " + t("cli.lang.saved") + "\n")
 
 
 @click.group(invoke_without_command=True)
 @click.version_option(__version__, prog_name="iphone-storage-doctor")
+@click.option(
+    "--lang",
+    type=click.Choice(SUPPORTED),
+    default=None,
+    help="Language for this run (en, fr).",
+)
 @click.pass_context
-def main(ctx):
-    """Diagnostic et nettoyage du stockage d'un iPhone branché en USB."""
+def main(ctx, lang):
+    """Diagnose and clean an iPhone's storage over USB."""
+    set_language(lang)
+    if not lang and ctx.invoked_subcommand != "lang":
+        choose_language_once()
     if ctx.invoked_subcommand is None:
         ctx.invoke(doctor)
+
+
+@main.command("lang")
+@click.argument("language", type=click.Choice(SUPPORTED), required=False)
+def lang_cmd(language):
+    """Show or change the interface language."""
+    if language:
+        set_language(language)
+        path = save_language(language)
+        console.print("[green]OK[/green] " + t("cli.lang.saved"))
+        console.print(f"[dim]{path}[/dim]")
+        return
+    console.print(t("cli.lang.current", lang=LANGUAGE_NAMES[current()]))
+    console.print(f"[dim]ipsd lang {' | '.join(SUPPORTED)}[/dim]")
 
 
 @main.command()
@@ -143,7 +188,7 @@ def main(ctx):
 @json_option
 @coro
 async def storage(udid, as_json):
-    """Compteurs de stockage, sans parcourir les fichiers (instantané)."""
+    """Storage counters, without walking the files (instant)."""
     lockdown = await connect(udid)
     info = await get_info(lockdown)
     disk = await get_disk_usage(lockdown)
@@ -157,20 +202,20 @@ async def storage(udid, as_json):
 @main.command("apps")
 @udid_option
 @json_option
-@click.option("--limit", default=20, show_default=True, help="Nombre d'apps affichées.")
-@click.option("--user-only", is_flag=True, help="Exclut les apps système.")
+@click.option("--limit", default=20, show_default=True, help="How many apps to show.")
+@click.option("--user-only", is_flag=True, help="Exclude system apps.")
 @coro
 async def apps_cmd(udid, as_json, limit, user_only):
-    """Classe les applications par espace occupé."""
+    """Rank applications by the space they occupy."""
     lockdown = await connect(udid)
-    with console.status("Interrogation des applications…"):
+    with console.status(t("cli.status.apps")):
         found = await apps_mod.collect(lockdown, include_system=not user_only)
     if as_json:
         click.echo(to_json({"apps": found}))
         return
     apps_table(found, limit=limit)
     total = sum(a.total for a in found)
-    console.print(f"\n{len(found)} applications, [bold]{human(total)}[/bold] au total.")
+    console.print("\n" + t("cli.apps.total", count=len(found), size=human(total)))
 
 
 @main.command()
@@ -181,13 +226,13 @@ async def apps_cmd(udid, as_json, limit, user_only):
     type=click.Choice(["fast", "deep"]),
     default="deep",
     show_default=True,
-    help="« fast » ignore les sous-arbres volumineux de la photothèque.",
+    help="'fast' skips the largest photo-library subtrees.",
 )
-@click.option("--no-apps", is_flag=True, help="Saute la mesure des applications.")
-@click.option("--no-media", is_flag=True, help="Saute le parcours du volume média.")
+@click.option("--no-apps", is_flag=True, help="Skip measuring applications.")
+@click.option("--no-media", is_flag=True, help="Skip walking the media volume.")
 @coro
 async def doctor(udid, as_json, profile, no_apps, no_media):
-    """Diagnostic complet : où part la place, et ce qui est récupérable."""
+    """Full diagnosis: where the space went, and what is reclaimable."""
     lockdown = await connect(udid)
     info = await get_info(lockdown)
     disk = await get_disk_usage(lockdown)
@@ -198,16 +243,16 @@ async def doctor(udid, as_json, profile, no_apps, no_media):
     app_list = []
 
     if not no_apps:
-        with console.status("Mesure des applications (peut prendre ~30 s)…"):
+        with console.status(t("cli.status.apps_slow")):
             app_list = await apps_mod.collect(lockdown)
         findings += analyse_apps(app_list)
 
     if not no_media:
         async with MediaScanner(lockdown, profile=profile) as scanner:
-            with console.status("Parcours du volume média…") as status:
+            with console.status(t("cli.status.media")) as status:
 
                 def progress(count, path):
-                    status.update(f"Parcours du volume média… {count} fichiers")
+                    status.update(t("cli.status.media_count", count=count))
 
                 scan = await scanner.scan(on_progress=progress)
         media_bytes = scan.total_size
@@ -250,8 +295,11 @@ async def doctor(udid, as_json, profile, no_apps, no_media):
         }[health.state]
         console.print()
         console.print(
-            f"Batterie : [bold {colour}]{health.health_percent:.0f} %[/bold {colour}] "
-            f"de santé, {health.cycle_count} cycles. [dim]{health.verdict()}[/dim]"
+            t("battery.label.health")
+            + f": [bold {colour}]{health.health_percent:.0f} %[/bold {colour}], "
+            + f"{health.cycle_count} "
+            + t("battery.label.cycles").lower()
+            + f". [dim]{health.verdict()}[/dim]"
         )
     console.print()
     findings_table(findings)
@@ -269,34 +317,34 @@ async def doctor(udid, as_json, profile, no_apps, no_media):
 
 @main.command()
 @udid_option
-@click.option("--apply", "do_apply", is_flag=True, help="Supprime réellement.")
+@click.option("--apply", "do_apply", is_flag=True, help="Actually delete.")
 @click.option(
     "--no-quarantine",
     is_flag=True,
-    help="Supprime sans copier au préalable sur le Mac.",
+    help="Delete without copying to the Mac first.",
 )
 @click.option(
     "--quarantine-dir",
     type=click.Path(path_type=Path),
     default=None,
-    help=f"Dossier d'archivage (défaut : {clean_mod.DEFAULT_QUARANTINE}).",
+    help="Archive directory (default: ~/iphone-storage-doctor/quarantine).",
 )
-@click.option("--crash", "do_crash", is_flag=True, help="Traite aussi les rapports de plantage.")
-@click.option("--yes", is_flag=True, help="Passe la confirmation (scripts).")
+@click.option("--crash", "do_crash", is_flag=True, help="Also handle crash reports.")
+@click.option("--yes", is_flag=True, help="Skip the confirmation (for scripts).")
 @coro
 async def clean(udid, do_apply, no_quarantine, quarantine_dir, do_crash, yes):
-    """Supprime les fichiers classés SÛR. Simulation par défaut."""
+    """Delete files classified SAFE. Dry run by default."""
     lockdown = await connect(udid)
 
     async with MediaScanner(lockdown, profile="deep") as scanner:
-        with console.status("Recherche des fichiers récupérables…"):
+        with console.status(t("cli.status.searching")):
             scan = await scanner.scan()
     findings = [f for f in analyse_media(scan) if f.tier == SAFE]
     sizes = {f.path: f.size for f in scan.files}
 
     targets = clean_mod.selectable(findings)
     if not targets and not do_crash:
-        console.print("[green]Rien à nettoyer.[/green]")
+        console.print("[green]" + t("cli.clean.nothing") + "[/green]")
         return
 
     for f in targets:
@@ -310,7 +358,7 @@ async def clean(udid, do_apply, no_quarantine, quarantine_dir, do_crash, yes):
             human(plan.total_bytes),
             yes,
         ):
-            console.print("[yellow]Annulé. Rien n'a été supprimé.[/yellow]")
+            console.print("[yellow]" + t("cli.cancelled") + "[/yellow]")
             return
 
     report = await clean_mod.run(
@@ -327,14 +375,14 @@ async def clean(udid, do_apply, no_quarantine, quarantine_dir, do_crash, yes):
             f"\n[yellow]Simulation.[/yellow] {report.planned} fichiers, "
             f"[bold]{human(report.planned_bytes)}[/bold] seraient libérés."
         )
-        console.print("[dim]Relance avec --apply pour exécuter.[/dim]")
+        console.print("[dim]" + t("cli.clean.rerun") + "[/dim]")
     else:
         console.print(
             f"\n[green]✓[/green] {report.deleted} fichiers supprimés, "
             f"[bold]{human(report.deleted_bytes)}[/bold] libérés."
         )
         if report.quarantine_dir:
-            console.print(f"[dim]Copie de sécurité : {report.quarantine_dir}[/dim]")
+            console.print("[dim]" + t("cli.clean.backup", path=report.quarantine_dir) + "[/dim]")
         for failure in report.failures[:5]:
             console.print(f"[red]✗[/red] {failure}")
 
@@ -342,13 +390,13 @@ async def clean(udid, do_apply, no_quarantine, quarantine_dir, do_crash, yes):
         dest = (quarantine_dir or clean_mod.DEFAULT_QUARANTINE) / "crash-reports"
         crashes = await crash_mod.collect(lockdown)
         if not crashes.count:
-            console.print("\n[dim]Aucun rapport de plantage.[/dim]")
+            console.print("\n[dim]" + t("cli.crash.none") + "[/dim]")
         elif not do_apply:
-            console.print(f"\n[yellow]Simulation.[/yellow] {crashes.count} rapports à archiver.")
+            console.print("\n[yellow]" + t("cli.crash.dry_run", count=crashes.count) + "[/yellow]")
         elif not confirm_deletion(
-            "rapports de plantage", crashes.count, "quelques Mo", yes
+            t("cli.crash.label"), crashes.count, "", yes
         ):
-            console.print("[yellow]Rapports de plantage conservés.[/yellow]")
+            console.print("[yellow]" + t("cli.crash.kept") + "[/yellow]")
         else:
             size = await crash_mod.archive_and_clear(lockdown, dest, erase=True)
             console.print(
@@ -359,31 +407,31 @@ async def clean(udid, do_apply, no_quarantine, quarantine_dir, do_crash, yes):
 
 @main.command()
 @udid_option
-@click.option("--app", "wanted", multiple=True, help="Bundle id ou nom. Répétable.")
-@click.option("--top", type=int, default=None, help="Cible les N apps les plus lourdes.")
+@click.option("--app", "wanted", multiple=True, help="Bundle id or name. Repeatable.")
+@click.option("--top", type=int, default=None, help="Target the N heaviest apps.")
 @click.option(
     "--min-data",
     type=int,
     default=200,
     show_default=True,
-    help="Seuil de données en Mo pour qu'une app soit proposée.",
+    help="Data threshold in MB for an app to be offered.",
 )
-@click.option("--apply", "do_apply", is_flag=True, help="Désinstalle réellement.")
+@click.option("--apply", "do_apply", is_flag=True, help="Actually uninstall.")
 @click.option(
     "--force-risky",
     is_flag=True,
-    help="Autorise les apps signalées comme risquées (2FA, messageries…).",
+    help="Allow apps flagged as risky (2FA, messengers...).",
 )
-@click.option("--yes", is_flag=True, help="Passe la confirmation interactive.")
+@click.option("--yes", is_flag=True, help="Skip the interactive confirmation.")
 @coro
 async def purge(udid, wanted, top, min_data, do_apply, force_risky, yes):
-    """Désinstalle des apps pour récupérer leur cache. Simulation par défaut.
+    """Uninstall apps to reclaim their cache. Dry run by default.
 
-    iOS interdit de vider le cache d'une app depuis un Mac. Désinstaller est
-    le seul levier — au prix des données locales de l'app.
+    iOS does not let a Mac clear an app's cache. Uninstalling is the only
+    lever - at the cost of that app's local data.
     """
     lockdown = await connect(udid)
-    with console.status("Mesure des applications…"):
+    with console.status(t("cli.status.apps")):
         app_list = await apps_mod.collect(lockdown)
     before = await get_disk_usage(lockdown)
 
@@ -395,16 +443,16 @@ async def purge(udid, wanted, top, min_data, do_apply, force_risky, yes):
         chosen = pool[:top] if top else pool
 
     for term in missing:
-        err.print(f"[yellow]![/yellow] Aucune app ne correspond à « {term} ».")
+        err.print("[yellow]![/yellow] " + t("cli.purge.no_match", term=term))
     if not chosen:
-        console.print("[green]Aucune app ne dépasse le seuil.[/green]")
+        console.print("[green]" + t("cli.purge.below_threshold") + "[/green]")
         return
 
-    table = Table(title="Candidates à la désinstallation", show_edge=False, header_style="dim")
-    table.add_column("Application")
-    table.add_column("Récupéré", justify="right")
-    table.add_column("dont données", justify="right")
-    table.add_column("Risque")
+    table = Table(title=t("cli.purge.title"), show_edge=False, header_style="dim")
+    table.add_column(t("report.col.app"))
+    table.add_column(t("cli.purge.col.reclaimed"), justify="right")
+    table.add_column(t("cli.purge.col.of_data"), justify="right")
+    table.add_column(t("cli.purge.col.risk"))
     for c in chosen:
         risky = c.is_risky
         table.add_row(
@@ -429,11 +477,11 @@ async def purge(udid, wanted, top, min_data, do_apply, force_risky, yes):
         )
 
     if not do_apply:
-        console.print("\n[yellow]Simulation.[/yellow] Rien n'a été touché.")
-        console.print("[dim]Ajoute --apply pour désinstaller.[/dim]")
+        console.print("\n[yellow]" + t("cli.purge.untouched") + "[/yellow]")
+        console.print("[dim]" + t("cli.purge.add_apply") + "[/dim]")
         return
     if not effective:
-        console.print("\n[yellow]Rien à désinstaller.[/yellow]")
+        console.print("\n[yellow]" + t("cli.purge.nothing") + "[/yellow]")
         return
 
     console.print(
@@ -441,12 +489,15 @@ async def purge(udid, wanted, top, min_data, do_apply, force_risky, yes):
         "définitivement.[/bold red] Le binaire se retéléchargera depuis l'App Store."
     )
     if not yes:
-        answer = click.prompt("Tape SUPPRIMER pour confirmer", default="", show_default=False)
-        if answer.strip() != "SUPPRIMER":
-            console.print("[yellow]Annulé.[/yellow]")
+        word = t("cli.purge.confirm_word")
+        answer = click.prompt(
+            t("cli.purge.confirm_prompt", word=word), default="", show_default=False
+        )
+        if answer.strip() != word:
+            console.print("[yellow]" + t("cli.cancelled") + "[/yellow]")
             return
 
-    with console.status("Désinstallation…"):
+    with console.status(t("cli.status.uninstalling")):
         report = await purge_mod.run(
             lockdown, chosen, dry_run=False, allow_risky=force_risky
         )
@@ -458,34 +509,35 @@ async def purge(udid, wanted, top, min_data, do_apply, force_risky, yes):
         f"estimation [bold]{human(report.freed_estimate)}[/bold]."
     )
     console.print(
-        f"Espace libre mesuré : {human(before.free)} → [bold]{human(after.free)}[/bold] "
-        f"(+{human(report.freed_measured)})"
+        t(
+            "cli.purge.measured",
+            before=human(before.free),
+            after=human(after.free),
+            delta=human(report.freed_measured),
+        )
     )
     for name, reason in report.skipped:
-        console.print(f"[yellow]⊘[/yellow] {name} épargnée — {reason}")
+        console.print("[yellow]-[/yellow] " + t("cli.purge.spared", name=name, reason=reason))
     for failure in report.failures:
         console.print(f"[red]✗[/red] {failure}")
 
 
 @main.command()
 @udid_option
-@click.option("--yes", is_flag=True, help="Passe la confirmation.")
+@click.option("--yes", is_flag=True, help="Skip the confirmation.")
 @coro
 async def restart(udid, yes):
-    """Redémarre l'iPhone : vide la RAM et les fichiers temporaires."""
+    """Restart the iPhone: frees RAM and purges temporary files."""
     lockdown = await connect(udid)
-    console.print(
-        "[dim]Un redémarrage libère la mémoire vive et purge les fichiers "
-        "temporaires. L'effet sur l'espace disque est faible et temporaire.[/dim]"
-    )
-    if not yes and not click.confirm("Redémarrer l'iPhone maintenant ?", default=False):
-        console.print("[yellow]Annulé.[/yellow]")
+    console.print("[dim]" + t("cli.restart.note") + "[/dim]")
+    if not yes and not click.confirm(t("cli.restart.confirm"), default=False):
+        console.print("[yellow]" + t("cli.cancelled") + "[/yellow]")
         return
     from pymobiledevice3.services.diagnostics import DiagnosticsService
 
     async with DiagnosticsService(lockdown) as diag:
         await diag.restart()
-    console.print("[green]✓[/green] Redémarrage demandé.")
+    console.print("[green]OK[/green] " + t("cli.restart.done"))
 
 
 @main.command()
@@ -493,19 +545,19 @@ async def restart(udid, yes):
 @json_option
 @coro
 async def plan(udid, as_json):
-    """Les trois niveaux de nettoyage, et ce que chacun rapporte."""
+    """The three cleaning levels, and what each one reclaims."""
     lockdown = await connect(udid)
     info = await get_info(lockdown)
     disk = await get_disk_usage(lockdown)
     health = await battery_mod.collect(lockdown, info.product_type)
 
-    with console.status("Mesure des applications…"):
+    with console.status(t("cli.status.apps")):
         app_list = await apps_mod.collect(lockdown)
     async with MediaScanner(lockdown, profile="deep") as scanner:
-        with console.status("Parcours du volume média…") as status:
+        with console.status(t("cli.status.media")) as status:
 
             def progress(count, path):
-                status.update(f"Parcours du volume média… {count} fichiers")
+                status.update(t("cli.status.media_count", count=count))
 
             scan = await scanner.scan(on_progress=progress)
 
@@ -526,12 +578,12 @@ async def plan(udid, as_json):
 
 @main.command()
 @udid_option
-@click.option("--apply", "do_apply", is_flag=True, help="Exécute réellement le nettoyage.")
-@click.option("--no-quarantine", is_flag=True, help="Supprime sans copier sur le Mac.")
-@click.option("--yes", is_flag=True, help="Passe la confirmation (scripts).")
+@click.option("--apply", "do_apply", is_flag=True, help="Actually run the cleanup.")
+@click.option("--no-quarantine", is_flag=True, help="Delete without copying to the Mac.")
+@click.option("--yes", is_flag=True, help="Skip the confirmation (for scripts).")
 @coro
 async def boost(udid, do_apply, no_quarantine, yes):
-    """Relevé avant, nettoyage sûr, relevé après. Le bilan complet en une commande."""
+    """Measure, clean safely, measure again. The whole report in one command."""
     lockdown = await connect(udid)
     info = await get_info(lockdown)
 
@@ -540,10 +592,10 @@ async def boost(udid, do_apply, no_quarantine, yes):
     crashes_before = await crash_mod.collect(lockdown)
 
     device_panel(info, before)
-    console.print(Rule("[bold]Avant[/bold]", style="dim"))
+    console.print(Rule("[bold]" + t("cli.boost.before") + "[/bold]", style="dim"))
     before_tbl = Table(show_edge=False, show_header=False, box=None)
-    before_tbl.add_row("Espace libre", f"[bold]{human(before.free)}[/bold]")
-    before_tbl.add_row("Espace occupé", human(before.data_used))
+    before_tbl.add_row(t("cli.boost.free"), f"[bold]{human(before.free)}[/bold]")
+    before_tbl.add_row(t("cli.boost.used"), human(before.data_used))
     if health is not None:
         colour = {
             battery_mod.HEALTHY: "green",
@@ -551,20 +603,20 @@ async def boost(udid, do_apply, no_quarantine, yes):
             battery_mod.WORN: "red",
         }[health.state]
         before_tbl.add_row(
-            "Santé batterie",
+            t("cli.boost.battery"),
             f"[bold {colour}]{health.health_percent:.0f} %[/bold {colour}] "
             f"[dim]({health.cycle_count} cycles)[/dim]",
         )
-    before_tbl.add_row("Rapports de plantage", str(crashes_before.count))
+    before_tbl.add_row(t("cli.boost.crashes"), str(crashes_before.count))
     console.print(before_tbl)
 
     console.print()
-    console.print(Rule("[bold]Nettoyage[/bold]", style="dim"))
+    console.print(Rule("[bold]" + t("cli.boost.cleaning") + "[/bold]", style="dim"))
     async with MediaScanner(lockdown, profile="deep") as scanner:
-        with console.status("Recherche des fichiers récupérables…") as status:
+        with console.status(t("cli.status.searching")) as status:
 
             def progress(count, path):
-                status.update(f"Recherche… {count} fichiers examinés")
+                status.update(t("cli.status.media_count", count=count))
 
             scan = await scanner.scan(on_progress=progress)
     findings = [f for f in analyse_media(scan) if f.tier == SAFE]
@@ -581,7 +633,7 @@ async def boost(udid, do_apply, no_quarantine, yes):
             human(plan.total_bytes),
             yes,
         ):
-            console.print("[yellow]Annulé. Rien n'a été supprimé.[/yellow]")
+            console.print("[yellow]" + t("cli.cancelled") + "[/yellow]")
             return
 
     report = await clean_mod.run(
@@ -605,21 +657,21 @@ async def boost(udid, do_apply, no_quarantine, yes):
             f"\n[yellow]Simulation.[/yellow] {report.planned} fichiers, "
             f"[bold]{human(report.planned_bytes)}[/bold] seraient libérés."
         )
-        console.print("[dim]Relance avec --apply pour exécuter.[/dim]")
+        console.print("[dim]" + t("cli.clean.rerun") + "[/dim]")
         return
 
     after = await get_disk_usage(lockdown)
     console.print()
-    console.print(Rule("[bold]Après[/bold]", style="dim"))
+    console.print(Rule("[bold]" + t("cli.boost.after") + "[/bold]", style="dim"))
 
     result = Table(show_edge=False, header_style="dim")
     result.add_column("")
-    result.add_column("Avant", justify="right")
-    result.add_column("Après", justify="right")
-    result.add_column("Écart", justify="right")
+    result.add_column(t("cli.boost.before"), justify="right")
+    result.add_column(t("cli.boost.after"), justify="right")
+    result.add_column(t("cli.boost.delta"), justify="right")
     delta_free = after.free - before.free
     result.add_row(
-        "Espace libre",
+        t("cli.boost.free"),
         human(before.free),
         Text(human(after.free), style="bold"),
         Text(
@@ -628,7 +680,7 @@ async def boost(udid, do_apply, no_quarantine, yes):
         ),
     )
     result.add_row(
-        "Espace occupé",
+        t("cli.boost.used"),
         human(before.data_used),
         human(after.data_used),
         human(abs(after.data_used - before.data_used)),
@@ -640,11 +692,11 @@ async def boost(udid, do_apply, no_quarantine, yes):
         f"({human(report.deleted_bytes + crash_bytes)} de contenu retiré)."
     )
     if report.quarantine_dir:
-        console.print(f"[dim]Copie de sécurité : {report.quarantine_dir}[/dim]")
+        console.print("[dim]" + t("cli.clean.backup", path=report.quarantine_dir) + "[/dim]")
     for failure in report.failures[:3]:
         console.print(f"[red]✗[/red] {failure}")
 
-    with console.status("Mesure des applications…"):
+    with console.status(t("cli.status.apps")):
         app_list = await apps_mod.collect(lockdown)
     remaining = analyse_media(scan) + analyse_apps(app_list)
     action_plan(actions_mod.build(remaining, app_list, health, after))
@@ -655,12 +707,12 @@ async def boost(udid, do_apply, no_quarantine, yes):
 @json_option
 @coro
 async def battery(udid, as_json):
-    """Santé réelle de la batterie — première cause de lenteur d'un appareil ancien."""
+    """Real battery health - the top cause of slowness on an older device."""
     lockdown = await connect(udid)
     info = await get_info(lockdown)
     health = await battery_mod.collect(lockdown, info.product_type)
     if health is None:
-        err.print("[yellow]![/yellow] Compteurs de batterie indisponibles sur cet appareil.")
+        err.print("[yellow]![/yellow] " + t("battery.unavailable"))
         sys.exit(1)
     if as_json:
         click.echo(to_json({"device": info, "battery": health}))
@@ -673,70 +725,59 @@ async def battery(udid, as_json):
     }[health.state]
     table = Table(show_edge=False, show_header=False, box=None)
     table.add_row(
-        "Santé",
+        t("battery.label.health"),
         Text(f"{health.health_percent:.1f} %", style=f"bold {colour}"),
         f"[dim]{health.nominal_capacity} / {health.design_capacity} mAh[/dim]",
     )
     table.add_row(
-        "Cycles",
+        t("battery.label.cycles"),
         Text(str(health.cycle_count), style=f"bold {colour}"),
-        f"[dim]{health.cycles_ratio * 100:.0f} % des {health.rated_cycles} cycles "
-        "prévus par Apple[/dim]",
+        "[dim]"
+        + t(
+            "battery.cycles_detail",
+            pct=f"{health.cycles_ratio * 100:.0f}",
+            rated=health.rated_cycles,
+        )
+        + "[/dim]",
     )
-    table.add_row("Charge", f"{health.charge_percent} %", "")
+    table.add_row(t("battery.label.charge"), f"{health.charge_percent} %", "")
     if health.temperature_c is not None:
-        table.add_row("Température", f"{health.temperature_c:.1f} °C", "")
+        table.add_row(t("battery.label.temperature"), f"{health.temperature_c:.1f} °C", "")
     console.print(table)
     console.print()
     console.print(Panel(health.verdict(), border_style=colour))
     if health.throttling_likely:
-        console.print(
-            "\n[dim]Réglages > Batterie > État de la batterie indique si la "
-            "gestion des performances est active sur cet appareil.[/dim]"
-        )
+        console.print("\n[dim]" + t("battery.settings_hint") + "[/dim]")
 
 
 @main.command()
 @udid_option
 @coro
 async def purgeable(udid):
-    """Explique l'écart entre « libre » et « libérable », chiffres à l'appui."""
+    """Explain the gap between "free" and "purgeable", with the numbers."""
     lockdown = await connect(udid)
     disk = await get_disk_usage(lockdown)
     console.print(
-        f"Libre immédiatement      [bold]{human(disk.free)}[/bold]\n"
-        f"Libérable sous pression  [bold]{human(disk.purgeable)}[/bold]\n"
+        t("cli.purgeable.free_now")
+        + f"  [bold]{human(disk.free)}[/bold]\n"
+        + t("cli.purgeable.under_pressure")
+        + f"  [bold]{human(disk.purgeable)}[/bold]\n"
     )
-    console.print(
-        "[bold]Ce que c'est.[/bold] iOS garde des caches qu'il sait sacrifier "
-        "seul quand une écriture manque de place : vignettes, copies iCloud "
-        "locales, index de recherche, données d'apps marquées jetables.\n"
-    )
-    console.print(
-        "[bold]Pourquoi on ne peut pas le détailler.[/bold] Aucun service "
-        "accessible en USB ne l'expose. Vérifié sur cet appareil : le domaine "
-        "com.apple.mobile.storage renvoie vide, les clés mobilegestalt de "
-        "stockage sont refusées (DeprecationError), et NANDInfo est un blob "
-        "binaire du contrôleur flash — usure et blocs, pas une ventilation.\n"
-    )
-    console.print(
-        "[bold]Ce qu'il faut en faire.[/bold] Rien. Cet espace se libère tout "
-        "seul au moment où le système en a besoin. Un outil qui te promet de "
-        "« récupérer » ces octets te vend un nettoyage qu'iOS fait déjà.",
-        style="dim",
-    )
+    console.print(t("cli.purgeable.what") + "\n")
+    console.print(t("cli.purgeable.why") + "\n")
+    console.print(t("cli.purgeable.advice"), style="dim")
 
 
 @main.command()
 @udid_option
-@click.option("--save", "do_save", is_flag=True, help="Enregistre un instantané.")
+@click.option("--save", "do_save", is_flag=True, help="Save a snapshot.")
 @coro
 async def trend(udid, do_save):
-    """Compare l'état actuel aux instantanés précédents."""
+    """Compare the current state against earlier snapshots."""
     lockdown = await connect(udid)
     info = await get_info(lockdown)
     disk = await get_disk_usage(lockdown)
-    with console.status("Mesure des applications…"):
+    with console.status(t("cli.status.apps")):
         app_list = await apps_mod.collect(lockdown)
     current = history_mod.snapshot_from(info.udid, disk, app_list)
 
@@ -744,8 +785,7 @@ async def trend(udid, do_save):
     if not previous:
         path = history_mod.save(current)
         console.print(
-            f"Premier instantané enregistré : [dim]{path}[/dim]\n"
-            "Relance [bold]ipsd trend[/bold] dans quelques jours pour voir la dérive."
+            t("cli.trend.first", path=path)
         )
         return
 
@@ -754,17 +794,22 @@ async def trend(udid, do_save):
     delta_free = current.free - old.free
     arrow = "[green]+[/green]" if delta_free >= 0 else "[red]−[/red]"
     console.print(
-        f"Depuis le {old.taken_at:%d/%m/%Y} ({days:.1f} j) : espace libre "
-        f"{human(old.free)} → [bold]{human(current.free)}[/bold] "
-        f"({arrow}{human(abs(delta_free))})\n"
+        t(
+            "cli.trend.since",
+            date=f"{old.taken_at:%d/%m/%Y}",
+            days=f"{days:.1f}",
+            before=human(old.free),
+            after=human(current.free),
+        )
+        + f" ({arrow}{human(abs(delta_free))})\n"
     )
     changes = history_mod.diff(old, current)
     if not changes:
-        console.print("[dim]Aucune app n'a changé de taille.[/dim]")
+        console.print("[dim]" + t("cli.trend.stable") + "[/dim]")
     else:
         table = Table(show_edge=False, header_style="dim")
-        table.add_column("Application")
-        table.add_column("Variation", justify="right")
+        table.add_column(t("report.col.app"))
+        table.add_column(t("cli.trend.col.change"), justify="right")
         for name, delta in changes[:15]:
             style = "red" if delta > 0 else "green"
             sign = "+" if delta > 0 else "−"
@@ -773,18 +818,18 @@ async def trend(udid, do_save):
 
     if do_save:
         path = history_mod.save(current)
-        console.print(f"\n[dim]Instantané enregistré : {path}[/dim]")
+        console.print("\n[dim]" + t("cli.trend.saved", path=path) + "[/dim]")
 
 
 @main.command()
 @coro
 async def devices():
-    """Liste les appareils visibles."""
+    """List visible devices."""
     from .device import list_connected
 
     found = await list_connected()
     if not found:
-        err.print("[yellow]Aucun appareil. Branche l'iPhone et déverrouille-le.[/yellow]")
+        err.print("[yellow]" + t("cli.no_device") + "[/yellow]")
         sys.exit(1)
     for d in found:
         console.print(f"  {d['udid']}  [dim]{d['connection']}[/dim]")

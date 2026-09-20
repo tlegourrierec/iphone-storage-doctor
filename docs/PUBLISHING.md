@@ -71,14 +71,14 @@ tapent vraiment :
 ## Étape 4 — Une release, pour que Homebrew marche
 
 ```bash
-git tag v1.2.0 && git push origin v1.2.0
-gh release create v1.2.0 --generate-notes
+git tag v1.3.0 && git push origin v1.3.0
+gh release create v1.3.0 --generate-notes
 ```
 
 Récupère l'empreinte de l'archive et mets-la dans la formule :
 
 ```bash
-curl -sL https://github.com/TON_PSEUDO/iphone-storage-doctor/archive/refs/tags/v1.2.0.tar.gz | shasum -a 256
+curl -sL https://github.com/TON_PSEUDO/iphone-storage-doctor/archive/refs/tags/v1.3.0.tar.gz | shasum -a 256
 ```
 
 Colle le résultat à la place de `REPLACE_WITH_RELEASE_TARBALL_SHA256`, commit,

@@ -84,6 +84,20 @@ pipx install git+https://github.com/OWNER/iphone-storage-doctor
 
 Plug in the iPhone, unlock it, tap **Trust This Computer**, then run `ipsd doctor`.
 
+### Language
+
+The first run asks which language you want, and remembers it:
+
+```
+Choose your language / Choisis ta langue
+  1. English
+  2. Français
+```
+
+Change it any time with `ipsd lang fr`, override it for one run with
+`--lang en`, or set `IPSD_LANG` in your environment. Without a terminal to ask
+in, the tool follows your system locale and falls back to English.
+
 ## Commands
 
 | Command | What it does |
@@ -98,6 +112,7 @@ Plug in the iPhone, unlock it, tap **Trust This Computer**, then run `ipsd docto
 | `ipsd purge` | Uninstall apps to reclaim their cache, with guardrails |
 | `ipsd trend` | What grew since the last snapshot |
 | `ipsd restart` | Reboot the device |
+| `ipsd lang` | Show or change the interface language |
 
 Every command takes `--json`.
 

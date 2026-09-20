@@ -85,6 +85,7 @@ ipsd plan        # les trois niveaux de nettoyage et leurs gains
 ipsd purgeable   # ce qu'iOS appelle « libérable », et pourquoi on n'y touche pas
 ipsd trend       # dérive du stockage entre deux instantanés
 ipsd restart     # redémarre l'iPhone
+ipsd lang fr     # change la langue de l'interface
 ```
 
 Toutes les commandes acceptent `--json` pour être branchées sur autre chose.
@@ -138,6 +139,23 @@ de la saturation (sous ~10 % de libre), le système APFS n'a plus de marge et
 tout ralentit. Au-delà, passer de 30 à 50 Go libres ne change rien à la vitesse.
 `ipsd restart` vide la RAM et les fichiers temporaires — effet réel mais bref.
 L'outil ne promet pas mieux.
+
+## Langue
+
+Au premier lancement, l'outil demande la langue et la retient :
+
+```
+Choose your language / Choisis ta langue
+  1. English
+  2. Français
+```
+
+Modifiable avec `ipsd lang fr`, forçable pour une exécution avec `--lang en`,
+ou via la variable `IPSD_LANG`. Sans terminal pour poser la question, l'outil
+suit la locale du système et se rabat sur l'anglais.
+
+L'aide des commandes (`--help`) reste en anglais, comme le veut l'usage des
+outils en ligne de commande ; toute la sortie, elle, est traduite.
 
 ## Prérequis
 

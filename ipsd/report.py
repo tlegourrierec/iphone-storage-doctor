@@ -12,17 +12,14 @@ from rich.rule import Rule
 from rich.table import Table
 from rich.text import Text
 
+from .i18n import t
 from .rules import MANUAL, REVIEW, SAFE, Finding
 from .units import human, pct
 
 console = Console()
 
 TIER_STYLE = {SAFE: "bold green", REVIEW: "bold yellow", MANUAL: "bold red"}
-TIER_LABEL = {
-    SAFE: "SÛR",
-    REVIEW: "À ARBITRER",
-    MANUAL: "MANUEL",
-}
+TIER_KEY = {SAFE: "tier.safe", REVIEW: "tier.review", MANUAL: "tier.manual"}
 
 
 def device_panel(info, disk) -> None:
@@ -31,8 +28,8 @@ def device_panel(info, disk) -> None:
     body.append(f"{info.product_type} · iOS {info.product_version} ({info.build})\n")
     body.append(f"UDID {info.udid}")
     if info.battery_percent is not None:
-        body.append(f" · batterie {info.battery_percent} %")
-    console.print(Panel(body, title="Appareil", border_style="cyan"))
+        body.append(f" · {t('report.battery_short')} {info.battery_percent} %")
+    console.print(Panel(body, title=t("report.device"), border_style="cyan"))
 
 
 def storage_table(disk, media_bytes: int, apps_bytes: int, measured: bool = True) -> None:
@@ -44,16 +41,14 @@ def storage_table(disk, media_bytes: int, apps_bytes: int, measured: bool = True
     if not measured:
         # Sans mesure, une ventilation serait un chiffre inventé : on s'abstient.
         _free_summary(disk, capacity)
-        console.print(
-            "\n[dim]Ventilation par poste : lance [bold]ipsd doctor[/bold].[/dim]"
-        )
+        console.print(f"\n[dim]{t('report.breakdown_hint')}[/dim]")
         return
 
-    table = Table(title="Où part la place", show_edge=False, header_style="dim")
-    table.add_column("Poste")
-    table.add_column("Taille", justify="right")
-    table.add_column("% utilisé", justify="right")
-    table.add_column("Source", style="dim")
+    table = Table(title=t("report.where.title"), show_edge=False, header_style="dim")
+    table.add_column(t("report.col.item"))
+    table.add_column(t("report.col.size"), justify="right")
+    table.add_column(t("report.col.pct_used"), justify="right")
+    table.add_column(t("report.col.source"), style="dim")
 
     def row(label, value, source, style=""):
         table.add_row(
@@ -63,49 +58,46 @@ def storage_table(disk, media_bytes: int, apps_bytes: int, measured: bool = True
             source,
         )
 
-    row("Applications (code + données)", apps_bytes, "installation_proxy")
-    row("Volume média accessible", media_bytes, "AFC")
-    row("Non attribué / « Données système »", unattributed, "déduction", "yellow")
+    row(t("report.row.apps"), apps_bytes, "installation_proxy")
+    row(t("report.row.media"), media_bytes, "AFC")
+    row(t("report.row.unattributed"), unattributed, t("report.source.deduction"), "yellow")
     table.add_section()
-    row("Total occupé", used, "com.apple.disk_usage", "bold")
+    row(t("report.row.total"), used, "com.apple.disk_usage", "bold")
 
     console.print(table)
     console.print()
     _free_summary(disk, capacity)
     if unattributed > capacity * 0.15:
         console.print(
-            "\n[yellow]![/yellow] Le poste « non attribué » est important. Il couvre "
-            "iOS lui-même, les caches système et iCloud, hors de portée d'une "
-            "connexion USB sans jailbreak. Aucun outil ne peut le détailler.",
-            style="dim",
+            f"\n[yellow]![/yellow] {t('report.unattributed_note')}", style="dim"
         )
 
 
 def _free_summary(disk, capacity: int) -> None:
     tbl = Table(show_edge=False, show_header=False, box=None)
-    tbl.add_row("Capacité données", human(capacity))
-    tbl.add_row("Occupé", human(disk.data_used))
-    tbl.add_row("[bold]Libre immédiatement[/bold]", f"[bold]{human(disk.free)}[/bold]")
+    tbl.add_row(t("report.free.capacity"), human(capacity))
+    tbl.add_row(t("report.free.used"), human(disk.data_used))
+    tbl.add_row(f"[bold]{t('report.free.free')}[/bold]", f"[bold]{human(disk.free)}[/bold]")
     if disk.purgeable:
         tbl.add_row(
-            "Libérable par iOS sous pression",
-            f"{human(disk.purgeable)} [dim](caches qu'iOS sacrifiera seul)[/dim]",
+            t("report.free.purgeable"),
+            f"{human(disk.purgeable)} [dim]{t('report.free.purgeable_hint')}[/dim]",
         )
     console.print(tbl)
 
 
 def findings_table(findings: list[Finding]) -> None:
     if not findings:
-        console.print("[green]Rien à signaler.[/green]")
+        console.print(f"[green]{t('report.nothing')}[/green]")
         return
-    table = Table(title="Constats", show_edge=False, header_style="dim")
-    table.add_column("Niveau", no_wrap=True)
-    table.add_column("Constat")
-    table.add_column("Taille", justify="right", no_wrap=True)
-    table.add_column("Que faire")
+    table = Table(title=t("report.findings.title"), show_edge=False, header_style="dim")
+    table.add_column(t("report.col.level"), no_wrap=True)
+    table.add_column(t("report.col.finding"))
+    table.add_column(t("report.col.size"), justify="right", no_wrap=True)
+    table.add_column(t("report.col.what"))
     for f in findings:
         table.add_row(
-            Text(TIER_LABEL.get(f.tier, f.tier), style=TIER_STYLE.get(f.tier, "")),
+            Text(t(TIER_KEY[f.tier]) if f.tier in TIER_KEY else f.tier, style=TIER_STYLE.get(f.tier, "")),
             f"[bold]{f.title}[/bold]\n[dim]{f.detail}[/dim]",
             human(f.bytes),
             f.action,
@@ -116,18 +108,18 @@ def findings_table(findings: list[Finding]) -> None:
     arbitrable = sum(f.bytes for f in findings if f.tier == REVIEW)
     console.print()
     console.print(
-        f"[green]Récupérable sans risque :[/green] [bold]{human(reclaimable)}[/bold]"
-        f"   [yellow]Sur arbitrage :[/yellow] [bold]{human(arbitrable)}[/bold]"
+        f"[green]{t('report.reclaimable')}[/green] [bold]{human(reclaimable)}[/bold]"
+        f"   [yellow]{t('report.arbitrable')}[/yellow] [bold]{human(arbitrable)}[/bold]"
     )
 
 
 def apps_table(apps, limit: int = 20) -> None:
-    table = Table(title=f"Top {limit} applications", show_edge=False, header_style="dim")
-    table.add_column("Application")
-    table.add_column("Total", justify="right")
-    table.add_column("Code", justify="right")
-    table.add_column("Données", justify="right")
-    table.add_column("Part données", justify="right")
+    table = Table(title=t("report.apps.title", limit=limit), show_edge=False, header_style="dim")
+    table.add_column(t("report.col.app"))
+    table.add_column(t("report.col.total"), justify="right")
+    table.add_column(t("report.col.code"), justify="right")
+    table.add_column(t("report.col.data"), justify="right")
+    table.add_column(t("report.col.data_share"), justify="right")
     for a in apps[:limit]:
         ratio = a.data_ratio
         style = "yellow" if ratio > 0.6 and a.data_bytes > 300_000_000 else ""
@@ -146,14 +138,18 @@ def action_plan(plan) -> None:
     from .actions import AUTO, CHOICE, EXTERNAL
 
     if not plan.actions:
-        console.print("[green]Rien à faire. L'appareil est propre.[/green]")
+        console.print(f"[green]{t('actions.none')}[/green]")
         return
 
-    label = {AUTO: "SANS RISQUE", CHOICE: "TON CHOIX", EXTERNAL: "HORS OUTIL"}
+    label = {
+        AUTO: t("actions.kind.auto"),
+        CHOICE: t("actions.kind.choice"),
+        EXTERNAL: t("actions.kind.external"),
+    }
     style = {AUTO: "bold green", CHOICE: "bold yellow", EXTERNAL: "bold cyan"}
 
     console.print()
-    console.print(Rule("[bold]Ce que je peux faire maintenant[/bold]", style="dim"))
+    console.print(Rule(f"[bold]{t('actions.title')}[/bold]", style="dim"))
     console.print()
 
     for index, action in enumerate(plan.actions, start=1):
@@ -173,9 +169,9 @@ def action_plan(plan) -> None:
 
     if plan.reclaimable_total:
         console.print(
-            f" [green]Récupérable sans rien perdre :[/green] "
+            f" [green]{t('actions.reclaim_now')}[/green] "
             f"[bold]{human(plan.reclaimable_now)}[/bold]"
-            f"    [yellow]Au total si tu vas au bout :[/yellow] "
+            f"    [yellow]{t('actions.reclaim_total')}[/yellow] "
             f"[bold]{human(plan.reclaimable_total)}[/bold]"
         )
 
@@ -183,7 +179,7 @@ def action_plan(plan) -> None:
 def levels_table(levels, free_before: int = 0) -> None:
     """Les trois paliers, avec ce que chacun rapporte et ce qu'il coûte."""
     console.print()
-    console.print(Rule("[bold]Trois niveaux de nettoyage[/bold]", style="dim"))
+    console.print(Rule(f"[bold]{t('levels.title')}[/bold]", style="dim"))
     console.print()
 
     for level in levels:
@@ -192,7 +188,11 @@ def levels_table(levels, free_before: int = 0) -> None:
         head.append(f"   +{human(level.gain_bytes)}", style="bold green")
         if free_before:
             head.append(
-                f"   {human(free_before)} → {human(free_before + level.gain_bytes)} libres",
+                "   " + t(
+                    "levels.free_after",
+                    before=human(free_before),
+                    after=human(free_before + level.gain_bytes),
+                ),
                 style="dim",
             )
         console.print(head)
@@ -203,11 +203,7 @@ def levels_table(levels, free_before: int = 0) -> None:
         console.print(f"    [bold cyan]{level.command}[/bold cyan]")
         console.print()
 
-    console.print(
-        " [dim]Aucun niveau ne touche aux photos, aux bases iOS, ni aux apps\n"
-        " porteuses de données uniques (2FA, messageries, éditeurs photo).\n"
-        " Chaque suppression est confirmée par toi avant exécution.[/dim]"
-    )
+    console.print(f" [dim]{t('levels.footer')}[/dim]")
 
 
 def _encode(obj: Any) -> Any:

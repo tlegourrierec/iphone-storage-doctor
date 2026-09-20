@@ -10,6 +10,7 @@ from dataclasses import dataclass, field
 
 from .apps import AppUsage
 from .battery import BatteryHealth
+from .i18n import t
 from .purge import risk_of
 from .rules import SAFE, Finding
 
@@ -67,12 +68,12 @@ def build(
     if safe_total or crash:
         plan.actions.append(
             Action(
-                title="Nettoyer les caches régénérables",
+                title=t("action.clean.title"),
                 gain_bytes=safe_total + (crash.bytes if crash else 0),
                 command="ipsd clean --apply --crash",
                 kind=AUTO,
-                why="Caches d'analyse et rapports de plantage. iOS les reconstruit seul.",
-                caveat="Chaque fichier est copié sur le Mac avant d'être retiré.",
+                why=t("action.clean.why"),
+                caveat=t("action.clean.caveat"),
             )
         )
 
@@ -84,27 +85,33 @@ def build(
     for app in heavy[:max_apps]:
         plan.actions.append(
             Action(
-                title=f"Réinstaller {app.name}",
+                title=t("action.reinstall.title", app=app.name),
                 gain_bytes=app.total,
                 command=f"ipsd purge --app {app.bundle_id} --apply",
                 kind=CHOICE,
-                why=f"{app.name} porte {_short(app.data_bytes)} de données pour "
-                    f"{_short(app.binary_bytes)} de code.",
-                caveat="Tu devras te reconnecter. L'app se retélécharge depuis l'App Store.",
+                why=t(
+                    "action.reinstall.why",
+                    app=app.name,
+                    data=_short(app.data_bytes),
+                    code=_short(app.binary_bytes),
+                ),
+                caveat=t("action.reinstall.caveat"),
             )
         )
 
     if battery is not None and battery.throttling_likely:
         plan.actions.append(
             Action(
-                title="Faire remplacer la batterie",
+                title=t("action.battery.title"),
                 gain_bytes=0,
                 command=None,
                 kind=EXTERNAL,
-                why=f"Santé {battery.health_percent:.0f} %, {battery.cycle_count} cycles. "
-                    "iOS bride le processeur en dessous de 80 %.",
-                caveat="C'est le seul geste qui rend de la vitesse. Aucun "
-                       "nettoyage de fichiers n'y changera rien.",
+                why=t(
+                    "action.battery.why",
+                    health=f"{battery.health_percent:.0f}",
+                    cycles=battery.cycle_count,
+                ),
+                caveat=t("action.battery.caveat"),
             )
         )
 
@@ -113,14 +120,12 @@ def build(
         if ratio < LOW_SPACE_RATIO:
             plan.actions.append(
                 Action(
-                    title="Descendre sous le seuil critique d'espace",
+                    title=t("action.lowspace.title"),
                     gain_bytes=0,
                     command=None,
                     kind=EXTERNAL,
-                    why=f"Il reste {ratio * 100:.0f} % d'espace libre. Sous 10 %, "
-                        "APFS n'a plus de marge et tout ralentit.",
-                    caveat="C'est le seul cas où libérer de la place accélère "
-                           "réellement l'appareil.",
+                    why=t("action.lowspace.why", pct=f"{ratio * 100:.0f}"),
+                    caveat=t("action.lowspace.caveat"),
                 )
             )
 
@@ -181,28 +186,28 @@ def build_levels(
     levels = [
         Level(
             key=SIMPLE,
-            title="Simple",
+            title=t("levels.simple.title"),
             gain_bytes=sum(a.gain_bytes for a in auto),
-            promise="Caches régénérables et rapports de plantage.",
-            cost="Aucune perte. iOS reconstruit tout seul.",
+            promise=t("levels.simple.promise"),
+            cost=t("levels.simple.cost"),
             command="ipsd clean --apply --crash",
             actions=list(auto),
         ),
         Level(
             key=ADVANCED,
-            title="Avancé",
+            title=t("levels.advanced.title"),
             gain_bytes=sum(a.gain_bytes for a in auto + advanced_apps),
-            promise="Le simple, plus la réinstallation des apps les plus gonflées.",
-            cost="Reconnexion nécessaire sur ces apps. Rien d'irremplaçable.",
+            promise=t("levels.advanced.promise"),
+            cost=t("levels.advanced.cost"),
             command="ipsd purge --top 3 --apply",
             actions=auto + advanced_apps,
         ),
         Level(
             key=MAXIMUM,
-            title="Maximum",
+            title=t("levels.maximum.title"),
             gain_bytes=sum(a.gain_bytes for a in auto + choices),
-            promise="Toutes les apps re-téléchargeables sans données locales uniques.",
-            cost="Reconnexion sur chaque app concernée.",
+            promise=t("levels.maximum.promise"),
+            cost=t("levels.maximum.cost"),
             command="ipsd purge --min-data 400 --apply",
             actions=auto + choices,
         ),

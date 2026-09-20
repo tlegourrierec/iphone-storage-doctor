@@ -39,3 +39,14 @@ never says "no" is a rule that will delete something it should not.
 If you run the tool on a model we have not covered, open a *Device
 compatibility report*. iOS changes which lockdown services answer from one
 release to the next, and we cannot test every combination.
+
+## Adding or changing a message
+
+User-facing text lives in `ipsd/locales.py`, one key per message, **both
+languages required**. `tests/test_i18n.py` fails if a language is missing, if
+the two versions expect different `{variables}`, or if a translation was left
+identical to the English. Never build a sentence by concatenating translated
+fragments: word order differs between languages — give the whole sentence its
+own key with placeholders.
+
+Command help strings (`--help`) stay in English, as CLI convention dictates.

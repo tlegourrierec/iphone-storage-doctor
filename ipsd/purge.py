@@ -13,37 +13,20 @@ from dataclasses import dataclass, field
 from pymobiledevice3.services.installation_proxy import InstallationProxyService
 
 from .apps import AppUsage
+from .i18n import t
 
 # Catégories où la désinstallation détruit de l'irrécupérable. Le motif est
 # cherché dans le bundle id ET dans le nom affiché.
 RISKY: tuple[tuple[str, str], ...] = (
-    (
-        r"authenticat|authy|2fas|duo\b|otp|yubi",
-        "Codes à deux facteurs stockés localement : tu peux perdre l'accès à "
-        "tes comptes. Exporte-les d'abord.",
-    ),
-    (
-        r"whatsapp|signal|telegram|threema|wickr|olvid",
-        "Historique de conversations stocké sur l'appareil. Perdu sans "
-        "sauvegarde préalable.",
-    ),
+    (r"authenticat|authy|2fas|duo|otp|yubi", "purge.risk.2fa"),
+    (r"whatsapp|signal|telegram|threema|wickr|olvid", "purge.risk.messaging"),
     (
         r"metamask|trust ?wallet|ledger|trezor|exodus|phantom|rainbow|coinbase ?wallet",
-        "Clés privées / phrase de récupération locales. Perte définitive des "
-        "fonds sans la seed.",
+        "purge.risk.wallet",
     ),
-    (
-        r"lightroom|vsco|darkroom|snapseed|procreate|affinity|lumafusion",
-        "Projets et retouches non synchronisés stockés localement.",
-    ),
-    (
-        r"dayone|day one|bear|drafts|obsidian|notability|goodnotes|journal",
-        "Notes et documents potentiellement locaux uniquement.",
-    ),
-    (
-        r"garmin|strava|health|fitness|clue|flo\b",
-        "Historique d'activité ou de santé parfois local uniquement.",
-    ),
+    (r"lightroom|vsco|darkroom|snapseed|procreate|affinity|lumafusion", "purge.risk.editor"),
+    (r"dayone|day one|bear|drafts|obsidian|notability|goodnotes|journal", "purge.risk.notes"),
+    (r"garmin|strava|health|fitness|clue|flo", "purge.risk.health"),
 )
 
 SYSTEM_PROTECTED = "System"
@@ -76,9 +59,9 @@ class PurgeReport:
 def risk_of(app: AppUsage) -> str | None:
     """Retourne la raison du risque, ou None si la désinstallation est anodine."""
     haystack = f"{app.bundle_id} {app.name}".lower()
-    for pattern, reason in RISKY:
+    for pattern, key in RISKY:
         if re.search(pattern, haystack):
-            return reason
+            return t(key)
     return None
 
 

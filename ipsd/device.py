@@ -7,6 +7,8 @@ from typing import Any
 from pymobiledevice3.lockdown import create_using_usbmux
 from pymobiledevice3.usbmux import list_devices
 
+from .i18n import t
+
 
 class DeviceError(RuntimeError):
     """Erreur exploitable par l'utilisateur (message déjà en clair)."""
@@ -74,16 +76,10 @@ async def connect(udid: str | None = None):
         detail = str(exc) or exc.__class__.__name__
         low = f"{exc.__class__.__name__} {detail}".lower().replace("_", "")
         if "nodevice" in low or "no device" in low or "notfound" in low or "not found" in low:
-            raise DeviceError(
-                "Aucun iPhone détecté. Branche-le en USB, déverrouille-le, "
-                "et réponds « Se fier » à la demande d'appairage."
-            ) from exc
+            raise DeviceError(t("device.not_found")) from exc
         if "pair" in low or "password" in low or "trust" in low:
-            raise DeviceError(
-                "iPhone détecté mais non appairé. Déverrouille l'écran puis "
-                "accepte « Se fier à cet ordinateur »."
-            ) from exc
-        raise DeviceError(f"Connexion impossible : {detail}") from exc
+            raise DeviceError(t("device.not_paired")) from exc
+        raise DeviceError(t("device.connect_failed", detail=detail)) from exc
 
 
 async def get_info(lockdown) -> DeviceInfo:
@@ -113,9 +109,9 @@ async def get_disk_usage(lockdown) -> DiskUsage:
     try:
         raw = await lockdown.get_value("com.apple.disk_usage") or {}
     except Exception as exc:  # noqa: BLE001
-        raise DeviceError(f"Lecture du stockage impossible : {exc}") from exc
+        raise DeviceError(t("device.storage_failed", detail=exc)) from exc
     if not isinstance(raw, dict):
-        raise DeviceError("Réponse inattendue du domaine com.apple.disk_usage.")
+        raise DeviceError(t("device.unexpected_domain"))
     clean = {k: v for k, v in raw.items() if isinstance(v, (int, float, str, bool))}
     return DiskUsage(
         total_disk_capacity=int(raw.get("TotalDiskCapacity") or 0),

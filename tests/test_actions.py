@@ -1,3 +1,15 @@
+
+import pytest
+
+from ipsd.i18n import set_language
+
+
+@pytest.fixture(autouse=True)
+def _french():
+    """Ces tests vérifient le contenu des messages : on fixe la langue."""
+    set_language("fr")
+
+
 from ipsd.actions import AUTO, CHOICE, EXTERNAL, build
 from ipsd.apps import AppUsage
 from ipsd.battery import BatteryHealth
