@@ -5,7 +5,7 @@ class IphoneStorageDoctor < Formula
   homepage "https://github.com/tlegourrierec/iphone-storage-doctor"
   url "https://github.com/tlegourrierec/iphone-storage-doctor/archive/refs/tags/v1.3.0.tar.gz"
   # Remplacer par : shasum -a 256 de l'archive publiée par GitHub.
-  sha256 "REPLACE_WITH_RELEASE_TARBALL_SHA256"
+  sha256 "e5568c5f41bd91c70b8a62f18d155e6b3b8724a011bc888a0329fe751d88a76f"
   license "MIT"
 
   depends_on "python@3.13"
