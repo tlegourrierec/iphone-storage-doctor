@@ -1,0 +1,42 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "iphone-storage-doctor"
+version = "1.0.0"
+description = "Analyse le stockage d'un iPhone branché en USB et récupère de l'espace, sans jailbreak."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "Thomas Le Gourrierec" }]
+keywords = ["ios", "iphone", "storage", "usb", "afc", "pymobiledevice3"]
+classifiers = [
+  "Environment :: Console",
+  "Operating System :: MacOS :: MacOS X",
+  "Programming Language :: Python :: 3.11",
+  "Topic :: System :: Systems Administration",
+]
+dependencies = [
+  "pymobiledevice3>=11.0.0",
+  "click>=8.1",
+  "rich>=13.0",
+]
+
+[project.scripts]
+ipsd = "ipsd.cli:main"
+iphone-storage-doctor = "ipsd.cli:main"
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "pytest-asyncio>=0.23"]
+
+[project.urls]
+Homepage = "https://github.com/tlegourrierec/iphone-storage-doctor"
+
+[tool.setuptools.packages.find]
+include = ["ipsd*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
