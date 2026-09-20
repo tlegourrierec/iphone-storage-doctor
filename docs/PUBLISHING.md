@@ -27,11 +27,11 @@ exclut déjà.** Git s'en occupe : tu n'as rien à trier à la main. Concrèteme
 
 ## Étape 1 — Remplacer le pseudo GitHub
 
-Deux fichiers contiennent `OWNER` :
+Deux fichiers contiennent `tlegourrierec` :
 
 ```bash
 cd ~/Downloads/iphone-storage-doctor
-sed -i '' 's/OWNER/TON_PSEUDO/g' README.md Formula/iphone-storage-doctor.rb
+sed -i '' 's/tlegourrierec/TON_PSEUDO/g' README.md Formula/iphone-storage-doctor.rb
 git add -A && git commit -m "Point URLs at the public repository"
 ```
 

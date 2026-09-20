@@ -62,8 +62,14 @@ avant/après pour confirmer le gain réel plutôt que l'estimation.
 ### Homebrew
 
 ```bash
-brew install --formula ./Formula/iphone-storage-doctor.rb
+brew tap tlegourrierec/tap
+brew install iphone-storage-doctor
 ```
+
+Homebrew compile depuis les sources, ce qui exige des Command Line Tools à
+jour. Si l'installation s'arrête sur « Your Command Line Tools are too
+outdated », mets-les à jour ou utilise le script ci-dessus, qui n'a besoin
+d'aucun compilateur.
 
 ### Recommandé : le script d'installation
 
@@ -171,6 +177,7 @@ outils en ligne de commande ; toute la sortie, elle, est traduite.
 | `iPhone détecté mais non appairé` | Touche **Se fier à cet ordinateur** sur le téléphone, puis saisis son code. |
 | L'outil s'arrête en cours de route | Le câble a bougé. Rien ne reste à moitié supprimé : les fichiers sont copiés avant d'être retirés. Rebranche et relance. |
 | La sortie est dans la mauvaise langue | `ipsd lang fr` ou `ipsd lang en`. |
+| `brew install` dit que les Command Line Tools sont périmés | Homebrew compile depuis les sources : `sudo rm -rf /Library/Developer/CommandLineTools && sudo xcode-select --install`. Ou passe par `./install.sh`, qui n'a besoin d'aucun compilateur. |
 
 À savoir : `ipsd doctor` parcourt des dizaines de milliers de fichiers en USB et
 prend deux à trois minutes. `--profile fast` descend à une trentaine de

@@ -2,8 +2,8 @@ class IphoneStorageDoctor < Formula
   include Language::Python::Virtualenv
 
   desc "Diagnose iPhone storage and battery health over USB"
-  homepage "https://github.com/OWNER/iphone-storage-doctor"
-  url "https://github.com/OWNER/iphone-storage-doctor/archive/refs/tags/v1.3.0.tar.gz"
+  homepage "https://github.com/tlegourrierec/iphone-storage-doctor"
+  url "https://github.com/tlegourrierec/iphone-storage-doctor/archive/refs/tags/v1.3.0.tar.gz"
   # Remplacer par : shasum -a 256 de l'archive publiée par GitHub.
   sha256 "REPLACE_WITH_RELEASE_TARBALL_SHA256"
   license "MIT"

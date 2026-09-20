@@ -4,7 +4,7 @@
 feels slow.** Runs on your Mac over a USB cable. No jailbreak, no app on the
 phone, no account, nothing leaves your machine.
 
-[![CI](https://github.com/OWNER/iphone-storage-doctor/actions/workflows/ci.yml/badge.svg)](https://github.com/OWNER/iphone-storage-doctor/actions/workflows/ci.yml)
+[![CI](https://github.com/tlegourrierec/iphone-storage-doctor/actions/workflows/ci.yml/badge.svg)](https://github.com/tlegourrierec/iphone-storage-doctor/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](pyproject.toml)
 
@@ -72,7 +72,7 @@ which it can drive for you, with guardrails.
 ### Recommended: the install script
 
 ```bash
-git clone https://github.com/OWNER/iphone-storage-doctor
+git clone https://github.com/tlegourrierec/iphone-storage-doctor
 cd iphone-storage-doctor && ./install.sh
 ```
 
@@ -82,14 +82,19 @@ which is the most common reason a plain `pip3 install` fails.
 ### Homebrew
 
 ```bash
-brew tap OWNER/tap
+brew tap tlegourrierec/tap
 brew install iphone-storage-doctor
 ```
+
+Homebrew builds this from source, which requires up-to-date Command Line
+Tools. If `brew install` stops on *"Your Command Line Tools are too outdated"*,
+either update them from Software Update or use the install script above — it
+does not need a compiler.
 
 ### pipx
 
 ```bash
-pipx install git+https://github.com/OWNER/iphone-storage-doctor
+pipx install git+https://github.com/tlegourrierec/iphone-storage-doctor
 ```
 
 Plug in the iPhone, unlock it, tap **Trust This Computer**, then run `ipsd doctor`.
@@ -206,6 +211,7 @@ exchange for deleting files.
 | `iPhone detected but not paired` | Tap **Trust This Computer** on the phone, then enter its passcode. |
 | The tool stops mid-run | The cable came loose. Nothing is left half-deleted: quarantined files are copied before removal. Plug back in and re-run. |
 | Output is in the wrong language | `ipsd lang en` or `ipsd lang fr`. |
+| `brew install` says Command Line Tools are too outdated | Homebrew builds from source and needs current CLT: `sudo rm -rf /Library/Developer/CommandLineTools && sudo xcode-select --install`. Or use `./install.sh`, which needs no compiler. |
 
 Note: `ipsd doctor` walks tens of thousands of files over USB and takes two to
 three minutes. `--profile fast` cuts that to about thirty seconds with a
